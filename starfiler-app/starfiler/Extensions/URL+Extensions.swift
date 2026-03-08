@@ -115,16 +115,19 @@ enum UserPaths {
     }
 
     private static func expandedPathByResolvingHomeVariables(_ rawPath: String) -> String {
-        let expandedPath = expandHomeVariables(in: rawPath)
-        let normalizedPath = PathNormalizer.normalizeForComparison(expandedPath)
-        guard !normalizedPath.isEmpty else {
+        let trimmedPath = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedPath.isEmpty else {
             return rawPath
         }
-        if isHomeRelativeShortcutPath(normalizedPath) {
-            let homeRelativePath = homeDirectoryPath + "/" + normalizedPath
+
+        let normalizedInputPath = normalizedHomeAliasPath(from: trimmedPath)
+        if isHomeRelativeShortcutPath(normalizedInputPath) {
+            let homeRelativePath = homeDirectoryPath + "/" + normalizedInputPath
             return (homeRelativePath as NSString).expandingTildeInPath
         }
-        return normalizedPath
+
+        let expandedPath = expandHomeVariables(in: rawPath)
+        return PathNormalizer.normalizeForComparison(expandedPath)
     }
 
     private static func normalizedHomeAliasPath(from path: String) -> String {
