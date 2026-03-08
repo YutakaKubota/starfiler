@@ -18,6 +18,7 @@ final class ConfigManagerTests: XCTestCase {
     }
 
     override func tearDown() {
+        ConfigManager.setCustomConfigDirectory(nil)
         try? FileManager.default.removeItem(at: tempConfigDir)
         super.tearDown()
     }
@@ -260,7 +261,41 @@ final class ConfigManagerTests: XCTestCase {
 
         XCTAssertEqual(
             url.path,
-            "/Users/cypher/Library/Mobile Documents/com~apple~CloudDocs/myiclouddrive/dotfiles/Starfiler"
+            UserPaths.homeDirectoryURL
+                .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/myiclouddrive/dotfiles/Starfiler", isDirectory: true)
+                .standardizedFileURL
+                .path
+        )
+    }
+
+    func testExpandHomeVariablesResolvesHomeEnvironmentPath() {
+        let resolved = UserPaths.expandHomeVariables(
+            in: "$HOME/Library/Mobile Documents/com~apple~CloudDocs/myiclouddrive/dotfiles/Starfiler"
+        )
+
+        XCTAssertEqual(
+            resolved,
+            UserPaths.homeDirectoryURL
+                .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/myiclouddrive/dotfiles/Starfiler", isDirectory: true)
+                .standardizedFileURL
+                .path
+        )
+    }
+
+    func testCustomConfigDirectoryURLResolvesHomeEnvironmentPath() {
+        UserDefaults.standard.set(
+            "$HOME/Library/Mobile Documents/com~apple~CloudDocs/myiclouddrive/dotfiles/Starfiler",
+            forKey: "customConfigDirectory"
+        )
+
+        let url = ConfigManager.customConfigDirectoryURL()
+
+        XCTAssertEqual(
+            url?.path,
+            UserPaths.homeDirectoryURL
+                .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/myiclouddrive/dotfiles/Starfiler", isDirectory: true)
+                .standardizedFileURL
+                .path
         )
     }
 

@@ -92,7 +92,7 @@ enum UserPaths {
         return PathNormalizer.resolveExistingPath(standardizedPath, fileManager: fileManager)
     }
 
-    private static func expandedPathByResolvingHomeVariables(_ rawPath: String) -> String {
+    static func expandHomeVariables(in rawPath: String) -> String {
         let trimmedPath = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedPath.isEmpty else {
             return rawPath
@@ -107,13 +107,24 @@ enum UserPaths {
             expandedHomePath = homeDirectoryPath + String(normalizedPath.dropFirst("$HOME".count))
         } else if normalizedPath.hasPrefix("${HOME}/") {
             expandedHomePath = homeDirectoryPath + String(normalizedPath.dropFirst("${HOME}".count))
-        } else if isHomeRelativeShortcutPath(normalizedPath) {
-            expandedHomePath = homeDirectoryPath + "/" + normalizedPath
         } else {
             expandedHomePath = normalizedPath
         }
 
         return (expandedHomePath as NSString).expandingTildeInPath
+    }
+
+    private static func expandedPathByResolvingHomeVariables(_ rawPath: String) -> String {
+        let expandedPath = expandHomeVariables(in: rawPath)
+        let normalizedPath = PathNormalizer.normalizeForComparison(expandedPath)
+        guard !normalizedPath.isEmpty else {
+            return rawPath
+        }
+        if isHomeRelativeShortcutPath(normalizedPath) {
+            let homeRelativePath = homeDirectoryPath + "/" + normalizedPath
+            return (homeRelativePath as NSString).expandingTildeInPath
+        }
+        return normalizedPath
     }
 
     private static func normalizedHomeAliasPath(from path: String) -> String {

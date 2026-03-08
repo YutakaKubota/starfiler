@@ -15,8 +15,9 @@ enum ConfigManagerError: LocalizedError {
 }
 
 final class ConfigManager {
-    private static let fixedDefaultConfigDirectoryPath = "/Users/eipoc/Library/Mobile Documents/com~apple~CloudDocs/myiclouddrive/dotfiles/Starfiler"
+    private static let defaultConfigDirectoryPath = "$HOME/Library/Mobile Documents/com~apple~CloudDocs/myiclouddrive/dotfiles/Starfiler"
     private static let previousFixedDefaultConfigDirectoryPaths = [
+        "/Users/eipoc/Library/Mobile Documents/com~apple~CloudDocs/myiclouddrive/dotfiles/Starfiler",
         "/Users/eipoc/Library/CloudStorage/GoogleDrive-yutaka.kubota@nil-one.com/My Drive/DropBox/dotfiles/Starfiler",
     ]
     private static let legacyConfigMigrationMarkerPrefix = "legacyConfigMigratedToFixedDefault"
@@ -170,7 +171,8 @@ final class ConfigManager {
         guard let path = UserDefaults.standard.string(forKey: customConfigDirectoryKey) else {
             return nil
         }
-        return URL(fileURLWithPath: path, isDirectory: true)
+        let resolvedPath = UserPaths.expandHomeVariables(in: path)
+        return URL(fileURLWithPath: resolvedPath, isDirectory: true).standardizedFileURL
     }
 
     static func setCustomConfigDirectory(_ url: URL?) {
@@ -185,7 +187,8 @@ final class ConfigManager {
         fileManager _: FileManager = .default,
         bundleIdentifier _: String = Bundle.main.bundleIdentifier ?? "com.nilone.starfiler"
     ) -> URL {
-        return URL(fileURLWithPath: fixedDefaultConfigDirectoryPath, isDirectory: true).standardizedFileURL
+        let resolvedPath = UserPaths.expandHomeVariables(in: defaultConfigDirectoryPath)
+        return URL(fileURLWithPath: resolvedPath, isDirectory: true).standardizedFileURL
     }
 
     static func existingConfigFileNames(in directory: URL, fileManager: FileManager = .default) -> [String] {

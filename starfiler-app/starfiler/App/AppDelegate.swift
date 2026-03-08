@@ -9,10 +9,10 @@ private struct LaunchOptions {
     init(arguments: [String] = ProcessInfo.processInfo.arguments) {
         isUITest = arguments.contains("--uitest")
         sandboxRoot = Self.pathValue(for: "--sandbox-root", arguments: arguments).map {
-            URL(fileURLWithPath: $0, isDirectory: true).standardizedFileURL
+            URL(fileURLWithPath: UserPaths.expandHomeVariables(in: $0), isDirectory: true).standardizedFileURL
         }
         configRoot = Self.pathValue(for: "--config-root", arguments: arguments).map {
-            URL(fileURLWithPath: $0, isDirectory: true).standardizedFileURL
+            URL(fileURLWithPath: UserPaths.expandHomeVariables(in: $0), isDirectory: true).standardizedFileURL
         }
         disableAnimations = arguments.contains("--disable-animations")
     }
