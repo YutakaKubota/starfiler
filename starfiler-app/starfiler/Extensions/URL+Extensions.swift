@@ -444,7 +444,7 @@ enum PathNormalizer {
 
 extension URL {
     private static let mediaImageExtensionWhitelist: Set<String> = [
-        "jpg", "jpeg", "png", "gif", "bmp", "tiff", "tif", "heic", "heif", "webp", "avif", "svg", "ico"
+        "jpg", "jpeg", "png", "gif", "bmp", "tiff", "tif", "heic", "heif", "webp", "avif", "svg", "ico", "psd", "psb"
     ]
 
     private static let mediaVideoExtensionWhitelist: Set<String> = [

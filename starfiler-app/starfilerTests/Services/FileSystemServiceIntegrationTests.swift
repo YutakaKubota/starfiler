@@ -96,6 +96,30 @@ final class FileSystemServiceIntegrationTests: XCTestCase {
         XCTAssertTrue(recursive.contains(where: { $0.name == "nested.png" }))
     }
 
+    func testMediaItemsTreatsPhotoshopDocumentsAsMedia() async throws {
+        let workspace = try SandboxFixtureWorkspace()
+        try "photoshop fixture".write(
+            to: workspace.url("left/media/layout.psd"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "large photoshop fixture".write(
+            to: workspace.url("left/media/layout-large.psb"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let sut = FileSystemService()
+        let items = try await sut.mediaItems(
+            in: workspace.url("left/media"),
+            recursive: false,
+            includeHiddenFiles: true
+        )
+
+        XCTAssertTrue(items.contains(where: { $0.name == "layout.psd" }))
+        XCTAssertTrue(items.contains(where: { $0.name == "layout-large.psb" }))
+    }
+
     func testMediaItemsDoesNotTreatTypeScriptAsMedia() async throws {
         let workspace = try SandboxFixtureWorkspace()
         try "const answer: number = 42".write(
