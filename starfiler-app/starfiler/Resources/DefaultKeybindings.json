@@ -37,6 +37,7 @@
       "Ctrl-m": "move",
       "Ctrl-D Ctrl-D": "delete",
       "Ctrl-g Ctrl-r": "rename",
+      "Option-r": "rename",
       "Ctrl-n": "createDirectory",
       "/": "enterFilterMode",
       "Tab": "switchPane",
