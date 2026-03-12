@@ -29,6 +29,7 @@ final class PreviewViewModelTests: XCTestCase {
         let sut = PreviewViewModel()
 
         XCTAssertNil(sut.state.selectedFileURL)
+        XCTAssertNil(sut.state.selectedFileDateModified)
         XCTAssertNil(sut.state.currentDirectoryURL)
         XCTAssertTrue(sut.state.siblingMediaURLs.isEmpty)
     }
@@ -45,6 +46,7 @@ final class PreviewViewModelTests: XCTestCase {
         )
 
         XCTAssertEqual(sut.state.selectedFileURL, file.url)
+        XCTAssertEqual(sut.state.selectedFileDateModified, file.dateModified)
         XCTAssertEqual(sut.state.currentDirectoryURL, directoryURL)
     }
 
@@ -93,5 +95,41 @@ final class PreviewViewModelTests: XCTestCase {
         sut.setSelectedFileURL(URL(fileURLWithPath: "/tmp/test/file.txt"))
 
         XCTAssertEqual(callbackCount, 1)
+    }
+
+    func testUpdateSelectionRefreshesStateWhenSelectedFileTimestampChanges() {
+        let sut = PreviewViewModel()
+        let originalDate = Date(timeIntervalSinceReferenceDate: 100)
+        let updatedDate = Date(timeIntervalSinceReferenceDate: 200)
+        let original = FileItem(
+            url: URL(fileURLWithPath: "/tmp/test/photo.jpg"),
+            name: "photo.jpg",
+            isDirectory: false,
+            size: 1024,
+            dateModified: originalDate,
+            isHidden: false,
+            isSymlink: false,
+            isPackage: false
+        )
+        let updated = FileItem(
+            url: original.url,
+            name: original.name,
+            isDirectory: false,
+            size: 2048,
+            dateModified: updatedDate,
+            isHidden: false,
+            isSymlink: false,
+            isPackage: false
+        )
+
+        sut.updateContext(
+            selectedItem: original,
+            currentDirectoryURL: URL(fileURLWithPath: "/tmp/test"),
+            displayedItems: [original]
+        )
+        sut.updateSelection(selectedItem: updated)
+
+        XCTAssertEqual(sut.state.selectedFileURL, original.url)
+        XCTAssertEqual(sut.state.selectedFileDateModified, updatedDate)
     }
 }

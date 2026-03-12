@@ -31,15 +31,15 @@ final class PreviewPaneViewController: NSViewController {
     private var starEffectsEnabled = true
     private var animationEffectSettings = AnimationEffectSettings.allEnabled
     private var currentState: PreviewViewModel.State = .default
-    private var currentMediaURLs: [URL] = []
+    private var currentMediaItems: [PreviewViewModel.MediaItem] = []
     private var currentMediaURL: URL?
     private var isFitModeActive = true
     private var preferredFitViewportWidth: CGFloat = 320
     private var preferredFitViewportHeight: CGFloat = 240
     private var imageLoadTask: Task<Void, Never>?
     private var currentPlayer: AVPlayer?
-    private let imageCache = NSCache<NSURL, NSImage>()
-    private var prefetchTasks: [URL: Task<Void, Never>] = [:]
+    private let imageCache = NSCache<NSString, NSImage>()
+    private var prefetchTasks: [String: Task<Void, Never>] = [:]
 
     var onImageSelectionChanged: ((URL?) -> Void)?
     var onNavigateRequested: ((URL) -> Void)?
@@ -307,13 +307,17 @@ final class PreviewPaneViewController: NSViewController {
     private func applyState(_ state: PreviewViewModel.State) {
         currentState = state
         updatePathControl(for: state)
-        applyMediaURLs(state.siblingMediaURLs, selectedFileURL: state.selectedFileURL)
+        applyMediaItems(state.siblingMediaItems, selectedFileURL: state.selectedFileURL)
     }
 
-    private func applyMediaURLs(_ urls: [URL], selectedFileURL: URL?) {
-        currentMediaURLs = urls.map(\.standardizedFileURL)
-        let cachedImageURLs = Set(currentMediaURLs.filter(\.isImageFile))
-        prunePrefetchTasks(keeping: cachedImageURLs)
+    private func applyMediaItems(_ items: [PreviewViewModel.MediaItem], selectedFileURL: URL?) {
+        currentMediaItems = items
+        let cachedImageKeys = Set(
+            currentMediaItems
+                .filter { $0.url.isImageFile }
+                .map(Self.cacheKey(for:))
+        )
+        prunePrefetchTasks(keeping: cachedImageKeys)
 
         let selectedMediaURL = selectedFileURL?.standardizedFileURL
         let selectedIsMedia = selectedMediaURL?.isMediaFile ?? false
@@ -321,23 +325,23 @@ final class PreviewPaneViewController: NSViewController {
         if
             let selectedMediaURL,
             selectedIsMedia,
-            let index = currentMediaURLs.firstIndex(of: selectedMediaURL)
+            let index = currentMediaItems.firstIndex(where: { $0.url == selectedMediaURL })
         {
-            setCurrentMedia(url: currentMediaURLs[index], notifySelection: false)
+            setCurrentMedia(item: currentMediaItems[index], notifySelection: false)
             return
         }
 
         if selectedFileURL != nil, !selectedIsMedia {
-            setCurrentMedia(url: nil, notifySelection: false, message: "Media preview supports images and videos.")
+            setCurrentMedia(item: nil, notifySelection: false, message: "Media preview supports images and videos.")
             return
         }
 
-        let fallbackMessage = currentMediaURLs.isEmpty ? "No media files found" : "Media preview supports images and videos."
-        setCurrentMedia(url: nil, notifySelection: false, message: fallbackMessage)
+        let fallbackMessage = currentMediaItems.isEmpty ? "No media files found" : "Media preview supports images and videos."
+        setCurrentMedia(item: nil, notifySelection: false, message: fallbackMessage)
     }
 
-    private func setCurrentMedia(url: URL?, notifySelection: Bool, message: String = "No media files found") {
-        currentMediaURL = url?.standardizedFileURL
+    private func setCurrentMedia(item: PreviewViewModel.MediaItem?, notifySelection: Bool, message: String = "No media files found") {
+        currentMediaURL = item?.url.standardizedFileURL
         updateNavigationState()
 
         guard let url = currentMediaURL else {
@@ -357,11 +361,11 @@ final class PreviewPaneViewController: NSViewController {
         }
 
         if url.isImageFile {
-            loadAndDisplayImage(from: url)
+            loadAndDisplayImage(from: item)
         } else if url.isVideoFile {
             displayVideo(from: url)
         } else {
-            setCurrentMedia(url: nil, notifySelection: notifySelection, message: "Unsupported media format")
+            setCurrentMedia(item: nil, notifySelection: notifySelection, message: "Unsupported media format")
             return
         }
 
@@ -371,8 +375,10 @@ final class PreviewPaneViewController: NSViewController {
     }
 
     private func updateNavigationState() {
-        let count = currentMediaURLs.count
-        let currentIndex = currentMediaURL.flatMap { currentMediaURLs.firstIndex(of: $0) }
+        let count = currentMediaItems.count
+        let currentIndex = currentMediaURL.flatMap { currentURL in
+            currentMediaItems.firstIndex(where: { $0.url == currentURL })
+        }
 
         if let currentIndex {
             positionLabel.stringValue = "\(currentIndex + 1) / \(count)"
@@ -391,7 +397,14 @@ final class PreviewPaneViewController: NSViewController {
         actualSizeButton.isEnabled = hasImage
     }
 
-    private func loadAndDisplayImage(from url: URL) {
+    private func loadAndDisplayImage(from item: PreviewViewModel.MediaItem?) {
+        guard let item else {
+            return
+        }
+
+        let url = item.url
+        let cacheKey = Self.cacheKey(for: item)
+
         currentPlayer?.pause()
         currentPlayer = nil
         playerView.player = nil
@@ -399,7 +412,7 @@ final class PreviewPaneViewController: NSViewController {
 
         imageLoadTask?.cancel()
 
-        if let cached = imageCache.object(forKey: url as NSURL) {
+        if let cached = imageCache.object(forKey: cacheKey as NSString) {
             displayLoadedImage(cached)
             return
         }
@@ -423,7 +436,7 @@ final class PreviewPaneViewController: NSViewController {
                     return
                 }
 
-                self.imageCache.setObject(loadedImage, forKey: url as NSURL)
+                self.imageCache.setObject(loadedImage, forKey: cacheKey as NSString)
                 self.displayLoadedImage(loadedImage)
             }
         }
@@ -588,67 +601,75 @@ final class PreviewPaneViewController: NSViewController {
 
     private func prefetchAroundCurrentImage() {
         guard let currentMediaURL,
-              let currentIndex = currentMediaURLs.firstIndex(of: currentMediaURL) else {
+              let currentIndex = currentMediaItems.firstIndex(where: { $0.url == currentMediaURL }) else {
             return
         }
 
         let candidateIndices = [currentIndex - 1, currentIndex + 1, currentIndex - 2, currentIndex + 2]
-        for index in candidateIndices where currentMediaURLs.indices.contains(index) {
-            let url = currentMediaURLs[index]
-            guard url.isImageFile else {
+        for index in candidateIndices where currentMediaItems.indices.contains(index) {
+            let item = currentMediaItems[index]
+            guard item.url.isImageFile else {
                 continue
             }
-            prefetchImage(at: url)
+            prefetchImage(item)
         }
     }
 
-    private func prefetchImage(at url: URL) {
-        let normalizedURL = url.standardizedFileURL
-        guard imageCache.object(forKey: normalizedURL as NSURL) == nil else {
+    private func prefetchImage(_ item: PreviewViewModel.MediaItem) {
+        let cacheKey = Self.cacheKey(for: item)
+        guard imageCache.object(forKey: cacheKey as NSString) == nil else {
             return
         }
-        guard prefetchTasks[normalizedURL] == nil else {
+        guard prefetchTasks[cacheKey] == nil else {
             return
         }
 
-        prefetchTasks[normalizedURL] = Task(priority: .utility) { [weak self] in
-            let loadedImage = await Self.decodeImage(from: normalizedURL)
+        prefetchTasks[cacheKey] = Task(priority: .utility) { [weak self] in
+            let loadedImage = await Self.decodeImage(from: item.url)
             guard let self else {
                 return
             }
             if let loadedImage {
-                self.imageCache.setObject(loadedImage, forKey: normalizedURL as NSURL)
+                self.imageCache.setObject(loadedImage, forKey: cacheKey as NSString)
             }
-            self.prefetchTasks.removeValue(forKey: normalizedURL)
+            self.prefetchTasks.removeValue(forKey: cacheKey)
         }
     }
 
-    private func prunePrefetchTasks(keeping allowedURLs: Set<URL>) {
-        let staleURLs = prefetchTasks.keys.filter { !allowedURLs.contains($0) }
-        for url in staleURLs {
-            prefetchTasks[url]?.cancel()
-            prefetchTasks.removeValue(forKey: url)
+    private func prunePrefetchTasks(keeping allowedKeys: Set<String>) {
+        let staleKeys = prefetchTasks.keys.filter { !allowedKeys.contains($0) }
+        for key in staleKeys {
+            prefetchTasks[key]?.cancel()
+            prefetchTasks.removeValue(forKey: key)
         }
     }
 
     @objc
     private func handlePreviousImage() {
-        guard let currentMediaURL, let currentIndex = currentMediaURLs.firstIndex(of: currentMediaURL), currentIndex > 0 else {
+        guard let currentMediaURL,
+              let currentIndex = currentMediaItems.firstIndex(where: { $0.url == currentMediaURL }),
+              currentIndex > 0 else {
             return
         }
-        setCurrentMedia(url: currentMediaURLs[currentIndex - 1], notifySelection: true)
+        setCurrentMedia(item: currentMediaItems[currentIndex - 1], notifySelection: true)
     }
 
     @objc
     private func handleNextImage() {
-        guard let currentMediaURL, let currentIndex = currentMediaURLs.firstIndex(of: currentMediaURL) else {
+        guard let currentMediaURL,
+              let currentIndex = currentMediaItems.firstIndex(where: { $0.url == currentMediaURL }) else {
             return
         }
         let nextIndex = currentIndex + 1
-        guard currentMediaURLs.indices.contains(nextIndex) else {
+        guard currentMediaItems.indices.contains(nextIndex) else {
             return
         }
-        setCurrentMedia(url: currentMediaURLs[nextIndex], notifySelection: true)
+        setCurrentMedia(item: currentMediaItems[nextIndex], notifySelection: true)
+    }
+
+    private static func cacheKey(for item: PreviewViewModel.MediaItem) -> String {
+        let modifiedAt = item.dateModified?.timeIntervalSinceReferenceDate ?? -1
+        return "\(item.url.path)#\(modifiedAt)"
     }
 
     @objc

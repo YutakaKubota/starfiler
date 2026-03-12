@@ -4,15 +4,31 @@ import Observation
 @MainActor
 @Observable
 final class PreviewViewModel {
+    struct MediaItem: Sendable, Equatable {
+        let url: URL
+        let dateModified: Date?
+
+        init(url: URL, dateModified: Date?) {
+            self.url = url.standardizedFileURL
+            self.dateModified = dateModified
+        }
+    }
+
     struct State: Sendable, Equatable {
         var selectedFileURL: URL?
+        var selectedFileDateModified: Date?
         var currentDirectoryURL: URL?
-        var siblingMediaURLs: [URL]
+        var siblingMediaItems: [MediaItem]
+
+        var siblingMediaURLs: [URL] {
+            siblingMediaItems.map(\.url)
+        }
 
         static let `default` = State(
             selectedFileURL: nil,
+            selectedFileDateModified: nil,
             currentDirectoryURL: nil,
-            siblingMediaURLs: []
+            siblingMediaItems: []
         )
     }
 
@@ -34,18 +50,23 @@ final class PreviewViewModel {
         displayedItems: [FileItem]
     ) {
         let selectedFileURL = normalizedPreviewableURL(from: selectedItem)
+        let selectedFileDateModified = selectedFileURL == nil ? nil : selectedItem?.dateModified
 
-        let siblingMediaURLs = displayedItems.compactMap { item -> URL? in
+        let siblingMediaItems = displayedItems.compactMap { item -> MediaItem? in
             if item.isDirectory && !item.isPackage {
                 return nil
             }
-            return item.url.isMediaFile ? item.url : nil
+            guard item.url.isMediaFile else {
+                return nil
+            }
+            return MediaItem(url: item.url, dateModified: item.dateModified)
         }
 
         let nextState = State(
             selectedFileURL: selectedFileURL,
+            selectedFileDateModified: selectedFileDateModified,
             currentDirectoryURL: currentDirectoryURL,
-            siblingMediaURLs: siblingMediaURLs
+            siblingMediaItems: siblingMediaItems
         )
 
         guard state != nextState else {
@@ -57,14 +78,16 @@ final class PreviewViewModel {
 
     func updateSelection(selectedItem: FileItem?) {
         let selectedFileURL = normalizedPreviewableURL(from: selectedItem)
+        let selectedFileDateModified = selectedFileURL == nil ? nil : selectedItem?.dateModified
         let normalizedCurrent = state.selectedFileURL?.standardizedFileURL
         let normalizedNext = selectedFileURL?.standardizedFileURL
-        guard normalizedCurrent != normalizedNext else {
+        guard normalizedCurrent != normalizedNext || state.selectedFileDateModified != selectedFileDateModified else {
             return
         }
 
         var updated = state
         updated.selectedFileURL = selectedFileURL
+        updated.selectedFileDateModified = selectedFileDateModified
         state = updated
     }
 
@@ -76,7 +99,8 @@ final class PreviewViewModel {
         }
 
         var updated = state
-        updated.selectedFileURL = url
+        updated.selectedFileURL = normalizedNext
+        updated.selectedFileDateModified = nil
         state = updated
     }
 
