@@ -839,6 +839,7 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
             name: fileItem.name,
             thumbnail: icon(for: fileItem, row: indexPath.item),
             isMarked: isMarked,
+            isVideo: fileItem.url.isVideoFile,
             palette: filerTheme.palette
         )
         return mediaItem
@@ -1900,14 +1901,15 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
                 let generator = AVAssetImageGenerator(asset: asset)
                 generator.appliesPreferredTrackTransform = true
                 generator.maximumSize = CGSize(width: maxPixelSize, height: maxPixelSize)
+                generator.requestedTimeToleranceBefore = CMTime(seconds: 5, preferredTimescale: 1)
+                generator.requestedTimeToleranceAfter = CMTime(seconds: 5, preferredTimescale: 1)
 
-                let time = CMTime(seconds: 0.5, preferredTimescale: 600)
-                guard let cgImage = try? generator.copyCGImage(at: time, actualTime: nil) else {
-                    return nil
+                let time = CMTime(seconds: 1, preferredTimescale: 600)
+                if let result = try? await generator.image(at: time) {
+                    let size = NSSize(width: result.image.width, height: result.image.height)
+                    return NSImage(cgImage: result.image, size: size)
                 }
-
-                let size = NSSize(width: cgImage.width, height: cgImage.height)
-                return NSImage(cgImage: cgImage, size: size)
+                return nil
             }
 
             return nil

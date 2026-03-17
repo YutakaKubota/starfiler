@@ -332,6 +332,7 @@ final class MediaCollectionItem: NSCollectionViewItem {
 
     private let titleLabel = NSTextField(labelWithString: "")
     private let markBadge = NSImageView()
+    private let videoIndicator = NSImageView()
 
     override func loadView() {
         view = NSView()
@@ -359,6 +360,18 @@ final class MediaCollectionItem: NSCollectionViewItem {
         markBadge.contentTintColor = .systemOrange
         markBadge.isHidden = true
 
+        videoIndicator.translatesAutoresizingMaskIntoConstraints = false
+        let config = NSImage.SymbolConfiguration(pointSize: 20, weight: .medium)
+        videoIndicator.image = NSImage(systemSymbolName: "play.circle.fill", accessibilityDescription: "Video")?
+            .withSymbolConfiguration(config)
+        videoIndicator.contentTintColor = .white
+        videoIndicator.wantsLayer = true
+        videoIndicator.layer?.shadowColor = NSColor.black.cgColor
+        videoIndicator.layer?.shadowOpacity = 0.6
+        videoIndicator.layer?.shadowOffset = CGSize(width: 0, height: -1)
+        videoIndicator.layer?.shadowRadius = 2
+        videoIndicator.isHidden = true
+
         view.wantsLayer = true
         view.layer?.cornerRadius = 0
         view.layer?.borderWidth = 1
@@ -367,6 +380,7 @@ final class MediaCollectionItem: NSCollectionViewItem {
         view.addSubview(imageView)
         view.addSubview(titleLabel)
         view.addSubview(markBadge)
+        view.addSubview(videoIndicator)
 
         NSLayoutConstraint.activate([
             imageView.topAnchor.constraint(equalTo: view.topAnchor),
@@ -380,7 +394,12 @@ final class MediaCollectionItem: NSCollectionViewItem {
             titleLabel.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor, constant: -8),
 
             markBadge.topAnchor.constraint(equalTo: view.topAnchor, constant: 4),
-            markBadge.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -6)
+            markBadge.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -6),
+
+            videoIndicator.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 6),
+            videoIndicator.bottomAnchor.constraint(equalTo: imageView.bottomAnchor, constant: -6),
+            videoIndicator.widthAnchor.constraint(equalToConstant: 24),
+            videoIndicator.heightAnchor.constraint(equalToConstant: 24)
         ])
     }
 
@@ -390,12 +409,13 @@ final class MediaCollectionItem: NSCollectionViewItem {
         }
     }
 
-    func configure(name: String, thumbnail: NSImage?, isMarked: Bool, palette: FilerThemePalette) {
+    func configure(name: String, thumbnail: NSImage?, isMarked: Bool, isVideo: Bool, palette: FilerThemePalette) {
         titleLabel.stringValue = name
         titleLabel.textColor = palette.primaryTextColor
         imageView?.image = thumbnail
         markBadge.isHidden = !isMarked
         markBadge.contentTintColor = palette.starAccentColor
+        videoIndicator.isHidden = !isVideo
         applySelectionAppearance(palette: palette)
     }
 

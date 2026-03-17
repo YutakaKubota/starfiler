@@ -483,6 +483,7 @@ final class PreviewPaneViewController: NSViewController {
         playerView.isHidden = false
         emptyStateLabel.isHidden = true
         isFitModeActive = false
+        player.play()
     }
 
     private func applyCurrentTheme() {
