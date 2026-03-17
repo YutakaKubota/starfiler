@@ -18,14 +18,20 @@ final class FilePaneViewModel {
         let directory: URL
         let mode: PaneDisplayMode
         let isRecursive: Bool
+        var foundCount: Int?
 
         var statusText: String {
+            let base: String
             switch mode {
             case .browser:
-                return isRecursive ? "Loading files recursively..." : "Loading files..."
+                base = isRecursive ? "Loading files recursively..." : "Loading files..."
             case .media:
-                return isRecursive ? "Loading media recursively..." : "Loading media..."
+                base = isRecursive ? "Loading media recursively..." : "Loading media..."
             }
+            if let count = foundCount, count > 0 {
+                return "\(base) (\(count) found)"
+            }
+            return base
         }
     }
 
@@ -371,7 +377,14 @@ final class FilePaneViewModel {
         guard displayMode == .browser else {
             return
         }
-        refreshCurrentDirectory(preservingSelectionByURL: false)
+
+        if activeNavigationTaskID != nil {
+            // Cancel the in-progress navigation and reload the destination with the new setting.
+            let targetDir = effectiveDirectory
+            loadDirectory(at: targetDir, previousDirectory: paneState.currentDirectory)
+        } else {
+            refreshCurrentDirectory(preservingSelectionByURL: false)
+        }
     }
 
     func setMediaRecursiveEnabled(_ enabled: Bool) {
@@ -385,7 +398,13 @@ final class FilePaneViewModel {
         guard displayMode == .media else {
             return
         }
-        refreshCurrentDirectory(preservingSelectionByURL: false)
+
+        if activeNavigationTaskID != nil {
+            let targetDir = effectiveDirectory
+            loadDirectory(at: targetDir, previousDirectory: paneState.currentDirectory)
+        } else {
+            refreshCurrentDirectory(preservingSelectionByURL: false)
+        }
     }
 
     func toggleRecursive() {
@@ -722,6 +741,19 @@ final class FilePaneViewModel {
         let shouldNotifyLoadingState = trigger == .explicit
         beginLoading(taskID: refreshTaskID, directory: currentDirectory, notify: shouldNotifyLoadingState)
 
+        var refreshProgressHandler: (@Sendable (Int) -> Void)?
+        if shouldNotifyLoadingState {
+            refreshProgressHandler = { [weak self] count in
+                Task<Void, Never> { @MainActor [weak self] in
+                    guard let self, self.activeLoadingTaskID == refreshTaskID else { return }
+                    var ctx = self.loadingContext
+                    ctx?.foundCount = count
+                    self.loadingContext = ctx
+                    self.onLoadingStateChanged?(ctx)
+                }
+            }
+        }
+
         loadTask?.cancel()
         loadTask = Task { [weak self] in
             guard let self else {
@@ -733,7 +765,7 @@ final class FilePaneViewModel {
             }
 
             do {
-                let items = try await self.loadItemsForCurrentMode(at: currentDirectory)
+                let items = try await self.loadItemsForCurrentMode(at: currentDirectory, onProgress: refreshProgressHandler)
                 guard !Task.isCancelled else {
                     return
                 }
@@ -824,7 +856,16 @@ final class FilePaneViewModel {
                 try await self.securityScopedBookmarkService.startAccessing(directory)
                 didAcquireDestinationScope = true
 
-                let items = try await self.loadItemsForCurrentMode(at: directory)
+                let progressHandler: @Sendable (Int) -> Void = { [weak self] count in
+                    Task<Void, Never> { @MainActor [weak self] in
+                        guard let self, self.activeLoadingTaskID == navigationTaskID else { return }
+                        var ctx = self.loadingContext
+                        ctx?.foundCount = count
+                        self.loadingContext = ctx
+                        self.onLoadingStateChanged?(ctx)
+                    }
+                }
+                let items = try await self.loadItemsForCurrentMode(at: directory, onProgress: progressHandler)
                 guard !Task.isCancelled else {
                     if didAcquireDestinationScope {
                         await self.securityScopedBookmarkService.stopAccessing(directory)
@@ -877,13 +918,14 @@ final class FilePaneViewModel {
         }
     }
 
-    private func loadItemsForCurrentMode(at directory: URL) async throws -> [FileItem] {
+    private func loadItemsForCurrentMode(at directory: URL, onProgress: (@Sendable (Int) -> Void)? = nil) async throws -> [FileItem] {
         switch displayMode {
         case .browser:
             if filesRecursiveEnabled {
                 return try await fileSystemService.recursiveContentsOfDirectory(
                     at: directory,
-                    includeHiddenFiles: directoryContents.showHiddenFiles
+                    includeHiddenFiles: directoryContents.showHiddenFiles,
+                    onProgress: onProgress
                 )
             }
             return try await fileSystemService.contentsOfDirectory(at: directory)
@@ -891,7 +933,8 @@ final class FilePaneViewModel {
             return try await fileSystemService.mediaItems(
                 in: directory,
                 recursive: mediaRecursiveEnabled,
-                includeHiddenFiles: directoryContents.showHiddenFiles
+                includeHiddenFiles: directoryContents.showHiddenFiles,
+                onProgress: onProgress
             )
         }
     }

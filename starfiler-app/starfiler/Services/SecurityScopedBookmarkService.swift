@@ -445,20 +445,6 @@ actor SecurityScopedBookmarkService: SecurityScopedBookmarkProviding {
     }
 
     private func canAccessWithoutBookmark(_ url: URL) -> Bool {
-        var isDirectory: ObjCBool = false
-        guard fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) else {
-            return false
-        }
-
-        if isDirectory.boolValue {
-            do {
-                _ = try fileManager.contentsOfDirectory(atPath: url.path)
-                return true
-            } catch {
-                return false
-            }
-        }
-
-        return fileManager.isReadableFile(atPath: url.path)
+        fileManager.isReadableFile(atPath: url.path)
     }
 }

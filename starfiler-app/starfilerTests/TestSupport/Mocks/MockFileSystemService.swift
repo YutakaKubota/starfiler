@@ -26,7 +26,7 @@ final class MockFileSystemService: FileSystemProviding, @unchecked Sendable {
     private(set) var recursiveContentsOfDirectoryCallCount = 0
     private(set) var recursiveContentsOfDirectoryCapturedArgs: [(url: URL, includeHiddenFiles: Bool)] = []
 
-    func recursiveContentsOfDirectory(at url: URL, includeHiddenFiles: Bool) async throws -> [FileItem] {
+    func recursiveContentsOfDirectory(at url: URL, includeHiddenFiles: Bool, onProgress: (@Sendable (Int) -> Void)?) async throws -> [FileItem] {
         recursiveContentsOfDirectoryCallCount += 1
         recursiveContentsOfDirectoryCapturedArgs.append((url, includeHiddenFiles))
         if let recursiveContentsOfDirectoryHandler {
@@ -42,7 +42,7 @@ final class MockFileSystemService: FileSystemProviding, @unchecked Sendable {
     private(set) var mediaItemsCallCount = 0
     private(set) var mediaItemsCapturedArgs: [(directory: URL, recursive: Bool, includeHiddenFiles: Bool)] = []
 
-    func mediaItems(in directory: URL, recursive: Bool, includeHiddenFiles: Bool) async throws -> [FileItem] {
+    func mediaItems(in directory: URL, recursive: Bool, includeHiddenFiles: Bool, onProgress: (@Sendable (Int) -> Void)?) async throws -> [FileItem] {
         mediaItemsCallCount += 1
         mediaItemsCapturedArgs.append((directory, recursive, includeHiddenFiles))
         if let mediaItemsHandler {

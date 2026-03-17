@@ -2,8 +2,18 @@ import Foundation
 
 protocol FileSystemProviding {
     func contentsOfDirectory(at url: URL) async throws -> [FileItem]
-    func recursiveContentsOfDirectory(at url: URL, includeHiddenFiles: Bool) async throws -> [FileItem]
-    func mediaItems(in directory: URL, recursive: Bool, includeHiddenFiles: Bool) async throws -> [FileItem]
+    func recursiveContentsOfDirectory(at url: URL, includeHiddenFiles: Bool, onProgress: (@Sendable (Int) -> Void)?) async throws -> [FileItem]
+    func mediaItems(in directory: URL, recursive: Bool, includeHiddenFiles: Bool, onProgress: (@Sendable (Int) -> Void)?) async throws -> [FileItem]
+}
+
+extension FileSystemProviding {
+    func recursiveContentsOfDirectory(at url: URL, includeHiddenFiles: Bool) async throws -> [FileItem] {
+        try await recursiveContentsOfDirectory(at: url, includeHiddenFiles: includeHiddenFiles, onProgress: nil)
+    }
+
+    func mediaItems(in directory: URL, recursive: Bool, includeHiddenFiles: Bool) async throws -> [FileItem] {
+        try await mediaItems(in: directory, recursive: recursive, includeHiddenFiles: includeHiddenFiles, onProgress: nil)
+    }
 }
 
 private actor FileSystemWorker {
@@ -40,7 +50,7 @@ private actor FileSystemWorker {
         return items
     }
 
-    func recursiveContentsOfDirectory(at url: URL, includeHiddenFiles: Bool) throws -> [FileItem] {
+    func recursiveContentsOfDirectory(at url: URL, includeHiddenFiles: Bool, onProgress: (@Sendable (Int) -> Void)?) throws -> [FileItem] {
         try Task.checkCancellation()
         let context = resolveEnumerationContext(for: url)
         let options: FileManager.DirectoryEnumerationOptions = includeHiddenFiles
@@ -65,6 +75,9 @@ private actor FileSystemWorker {
                 continue
             }
             items.append(item)
+            if items.count % 200 == 0 {
+                onProgress?(items.count)
+            }
         }
 
         return items.sorted {
@@ -72,7 +85,7 @@ private actor FileSystemWorker {
         }
     }
 
-    func mediaItems(in directory: URL, recursive: Bool, includeHiddenFiles: Bool) throws -> [FileItem] {
+    func mediaItems(in directory: URL, recursive: Bool, includeHiddenFiles: Bool, onProgress: (@Sendable (Int) -> Void)?) throws -> [FileItem] {
         try Task.checkCancellation()
         if !recursive {
             let items = try contentsOfDirectory(at: directory)
@@ -120,6 +133,9 @@ private actor FileSystemWorker {
             }
             if item.url.isMediaFile {
                 items.append(item)
+                if items.count % 200 == 0 {
+                    onProgress?(items.count)
+                }
             }
         }
 
@@ -186,21 +202,25 @@ struct FileSystemService: FileSystemProviding {
             .isSymbolicLinkKey,
             .isPackageKey
         ]
-    private let worker: FileSystemWorker
+    private let fileManager: FileManager
 
     init(fileManager: FileManager = .default) {
-        self.worker = FileSystemWorker(fileManager: fileManager, resourceKeys: Self.resourceKeys)
+        self.fileManager = fileManager
+    }
+
+    private func makeWorker() -> FileSystemWorker {
+        FileSystemWorker(fileManager: fileManager, resourceKeys: Self.resourceKeys)
     }
 
     func contentsOfDirectory(at url: URL) async throws -> [FileItem] {
-        try await worker.contentsOfDirectory(at: url)
+        try await makeWorker().contentsOfDirectory(at: url)
     }
 
-    func recursiveContentsOfDirectory(at url: URL, includeHiddenFiles: Bool) async throws -> [FileItem] {
-        try await worker.recursiveContentsOfDirectory(at: url, includeHiddenFiles: includeHiddenFiles)
+    func recursiveContentsOfDirectory(at url: URL, includeHiddenFiles: Bool, onProgress: (@Sendable (Int) -> Void)?) async throws -> [FileItem] {
+        try await makeWorker().recursiveContentsOfDirectory(at: url, includeHiddenFiles: includeHiddenFiles, onProgress: onProgress)
     }
 
-    func mediaItems(in directory: URL, recursive: Bool, includeHiddenFiles: Bool) async throws -> [FileItem] {
-        try await worker.mediaItems(in: directory, recursive: recursive, includeHiddenFiles: includeHiddenFiles)
+    func mediaItems(in directory: URL, recursive: Bool, includeHiddenFiles: Bool, onProgress: (@Sendable (Int) -> Void)?) async throws -> [FileItem] {
+        try await makeWorker().mediaItems(in: directory, recursive: recursive, includeHiddenFiles: includeHiddenFiles, onProgress: onProgress)
     }
 }
