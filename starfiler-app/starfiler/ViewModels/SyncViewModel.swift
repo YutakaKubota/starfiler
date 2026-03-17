@@ -69,6 +69,7 @@ final class SyncViewModel {
     private let comparisonService: any DirectoryComparing
     private let executionService: any SyncExecuting
     private let configManager: ConfigManager
+    private let securityScopedBookmarkService: any SecurityScopedBookmarkProviding
 
     private var compareTask: Task<Void, Never>?
     private var syncTask: Task<Void, Never>?
@@ -78,7 +79,8 @@ final class SyncViewModel {
         rightDirectory: URL,
         comparisonService: any DirectoryComparing = DirectoryComparisonService(),
         executionService: any SyncExecuting = SyncExecutionService(),
-        configManager: ConfigManager = ConfigManager()
+        configManager: ConfigManager = ConfigManager(),
+        securityScopedBookmarkService: any SecurityScopedBookmarkProviding = SecurityScopedBookmarkService.shared
     ) {
         self.leftDirectory = leftDirectory
         self.rightDirectory = rightDirectory
@@ -95,6 +97,7 @@ final class SyncViewModel {
         self.comparisonService = comparisonService
         self.executionService = executionService
         self.configManager = configManager
+        self.securityScopedBookmarkService = securityScopedBookmarkService
         self.synclets = configManager.loadSyncletsConfig().synclets
     }
 
@@ -106,12 +109,18 @@ final class SyncViewModel {
         scanProgress = 0
         items = []
 
+        let leftDir = leftDirectory
+        let rightDir = rightDirectory
+        let service = securityScopedBookmarkService
+
         compareTask = Task { [weak self] in
             guard let self else { return }
+            try? await service.startAccessing(leftDir)
+            try? await service.startAccessing(rightDir)
             do {
                 let result = try await self.comparisonService.compare(
-                    leftDirectory: self.leftDirectory,
-                    rightDirectory: self.rightDirectory,
+                    leftDirectory: leftDir,
+                    rightDirectory: rightDir,
                     direction: self.direction,
                     excludeRules: self.excludeRules,
                     progress: { [weak self] scanned in
@@ -127,6 +136,8 @@ final class SyncViewModel {
             } catch {
                 self.phase = .error(error.localizedDescription)
             }
+            await service.stopAccessing(leftDir)
+            await service.stopAccessing(rightDir)
         }
     }
 
@@ -140,13 +151,19 @@ final class SyncViewModel {
         syncProgress = 0
         syncTotal = actionableCount
 
+        let leftDir = leftDirectory
+        let rightDir = rightDirectory
+        let service = securityScopedBookmarkService
+
         syncTask = Task { [weak self] in
             guard let self else { return }
+            try? await service.startAccessing(leftDir)
+            try? await service.startAccessing(rightDir)
             do {
                 let result = try await self.executionService.execute(
                     items: self.items,
-                    leftBase: self.leftDirectory,
-                    rightBase: self.rightDirectory,
+                    leftBase: leftDir,
+                    rightBase: rightDir,
                     progress: { [weak self] completed, total, currentFile in
                         Task { @MainActor [weak self] in
                             self?.syncProgress = completed
@@ -161,6 +178,8 @@ final class SyncViewModel {
             } catch {
                 self.phase = .error(error.localizedDescription)
             }
+            await service.stopAccessing(leftDir)
+            await service.stopAccessing(rightDir)
         }
     }
 
