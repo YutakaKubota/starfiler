@@ -253,6 +253,11 @@ fi
 echo "[verify] installed binary hash matches build output ($DEST_HASH)"
 
 if [[ "$LAUNCH_AFTER_INSTALL" == true ]]; then
+  if /usr/bin/pgrep -x "$PROCESS_NAME" >/dev/null 2>&1; then
+    echo "[launch] stopping running process before relaunch: $PROCESS_NAME"
+    /usr/bin/pkill -x "$PROCESS_NAME" || true
+    /bin/sleep 0.5
+  fi
   echo "[launch] opening $APP_DEST"
   /usr/bin/open -a "$APP_DEST"
 fi
