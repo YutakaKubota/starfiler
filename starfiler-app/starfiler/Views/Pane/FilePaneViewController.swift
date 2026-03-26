@@ -225,6 +225,27 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
 
     private static let browserModeIconSize: CGFloat = 16
     private static let browserModeRowHeight: CGFloat = max(24, browserModeIconSize + 8)
+    private static let browserNameColumnDefaultWidth: CGFloat = 440
+    private static let browserSizeColumnDefaultWidth: CGFloat = 120
+    private static let browserModifiedColumnDefaultWidth: CGFloat = 180
+    private static let browserNameColumnMinimumWidth: CGFloat = 120
+    private static let browserSizeColumnMinimumWidth: CGFloat = 52
+    private static let browserModifiedColumnMinimumWidth: CGFloat = 84
+    private static let headerTrailingInset: CGFloat = 8
+    private static let headerPreferredBreadcrumbWidth: CGFloat = 280
+    private static let headerCompactBreadcrumbWidth: CGFloat = 40
+    private static let headerRegularSearchFieldMinimumWidth: CGFloat = 132
+    private static let headerCompactSearchFieldMinimumWidth: CGFloat = 80
+    private static let headerAbsoluteSearchFieldMinimumWidth: CGFloat = 56
+    private static let filesModeButtonMinimumWidth: CGFloat = 46
+    private static let mediaModeButtonMinimumWidth: CGFloat = 50
+    private static let recursiveToggleMinimumWidth: CGFloat = 18
+    private static let mediaIconSizeSliderWidth: CGFloat = 110
+    private static let mediaIconSizeValueLabelWidth: CGFloat = 44
+    private static let displayModeButtonsSpacing: CGFloat = 8
+    private static let recursiveToggleSpacing: CGFloat = 8
+    private static let mediaIconSliderSpacing: CGFloat = 4
+    private static let mediaIconLabelSpacing: CGFloat = 12
 
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -295,6 +316,8 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
     private var rangeSelectionAnchorIndex: Int?
     private var isMouseMultiSelectionActive = false
     private var isApplyingSelectionFromViewModel = false
+    private var searchControlsMinimumLeadingConstraint: NSLayoutConstraint?
+    private var searchFieldMinimumWidthConstraint: NSLayoutConstraint?
 
     var onStatusChanged: ((String, Int, Int) -> Void)?
     var onSelectionChanged: ((FileItem?) -> Void)?
@@ -349,6 +372,12 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
         configureContextMenu()
         bindViewModel()
         setActive(false)
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        adjustHeaderLayoutIfNeeded()
+        adjustBrowserColumnWidthsIfNeeded()
     }
 
     deinit {
@@ -911,7 +940,7 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
         searchControlsStackView.alignment = .centerY
         searchControlsStackView.spacing = 0
         searchControlsStackView.setContentHuggingPriority(.required, for: .horizontal)
-        searchControlsStackView.setContentCompressionResistancePriority(.required, for: .horizontal)
+        searchControlsStackView.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
 
         filesModeButton.translatesAutoresizingMaskIntoConstraints = false
         filesModeButton.isBordered = false
@@ -1048,18 +1077,18 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
 
         let nameColumn = NSTableColumn(identifier: Column.name)
         nameColumn.title = "Name"
-        nameColumn.width = 440
-        nameColumn.minWidth = 180
+        nameColumn.width = Self.browserNameColumnDefaultWidth
+        nameColumn.minWidth = Self.browserNameColumnMinimumWidth
 
         let sizeColumn = NSTableColumn(identifier: Column.size)
         sizeColumn.title = "Size"
-        sizeColumn.width = 120
-        sizeColumn.minWidth = 80
+        sizeColumn.width = Self.browserSizeColumnDefaultWidth
+        sizeColumn.minWidth = Self.browserSizeColumnMinimumWidth
 
         let modifiedColumn = NSTableColumn(identifier: Column.modified)
         modifiedColumn.title = "Modified"
-        modifiedColumn.width = 180
-        modifiedColumn.minWidth = 140
+        modifiedColumn.width = Self.browserModifiedColumnDefaultWidth
+        modifiedColumn.minWidth = Self.browserModifiedColumnMinimumWidth
 
         tableView.addTableColumn(nameColumn)
         tableView.addTableColumn(sizeColumn)
@@ -1079,6 +1108,155 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
             self?.updateSearchFieldAppearance()
             self?.onDidRequestActivate?()
         }
+    }
+
+    private func adjustBrowserColumnWidthsIfNeeded() {
+        guard currentDisplayMode == .browser else {
+            return
+        }
+
+        let availableWidth = scrollView.contentView.bounds.width
+        guard availableWidth > 0 else {
+            return
+        }
+
+        let targetWidths = Self.browserColumnWidths(
+            availableWidth: availableWidth,
+            intercellSpacing: tableView.intercellSpacing.width
+        )
+
+        applyColumnWidth(targetWidths.name, identifier: Column.name)
+        applyColumnWidth(targetWidths.size, identifier: Column.size)
+        applyColumnWidth(targetWidths.modified, identifier: Column.modified)
+    }
+
+    private func applyColumnWidth(_ width: CGFloat, identifier: NSUserInterfaceItemIdentifier) {
+        guard let column = tableView.tableColumns.first(where: { $0.identifier == identifier }) else {
+            return
+        }
+
+        let clampedWidth = max(width, 1)
+        guard abs(column.width - clampedWidth) >= 1 else {
+            return
+        }
+
+        column.width = clampedWidth
+    }
+
+    private func adjustHeaderLayoutIfNeeded() {
+        guard
+            let searchControlsMinimumLeadingConstraint,
+            let searchFieldMinimumWidthConstraint
+        else {
+            return
+        }
+
+        let availableWidth = headerView.bounds.width
+        guard availableWidth > 0 else {
+            return
+        }
+
+        let metrics = Self.headerLayoutMetrics(
+            availableWidth: availableWidth,
+            nonSearchControlsWidth: nonSearchControlsWidthForCurrentDisplayMode()
+        )
+
+        if abs(searchControlsMinimumLeadingConstraint.constant - metrics.breadcrumbReservation) >= 1 {
+            searchControlsMinimumLeadingConstraint.constant = metrics.breadcrumbReservation
+        }
+
+        if abs(searchFieldMinimumWidthConstraint.constant - metrics.searchFieldMinimumWidth) >= 1 {
+            searchFieldMinimumWidthConstraint.constant = metrics.searchFieldMinimumWidth
+        }
+    }
+
+    private func nonSearchControlsWidthForCurrentDisplayMode() -> CGFloat {
+        switch currentDisplayMode {
+        case .browser:
+            return Self.filesModeButtonMinimumWidth
+                + Self.mediaModeButtonMinimumWidth
+                + Self.displayModeButtonsSpacing
+                + max(filesRecursiveButton.fittingSize.width, Self.recursiveToggleMinimumWidth)
+                + Self.recursiveToggleSpacing
+        case .media:
+            return Self.filesModeButtonMinimumWidth
+                + Self.mediaModeButtonMinimumWidth
+                + Self.displayModeButtonsSpacing
+                + max(mediaRecursiveButton.fittingSize.width, Self.recursiveToggleMinimumWidth)
+                + Self.recursiveToggleSpacing
+                + Self.mediaIconSizeSliderWidth
+                + Self.mediaIconSliderSpacing
+                + Self.mediaIconSizeValueLabelWidth
+                + Self.mediaIconLabelSpacing
+        }
+    }
+
+    static func headerLayoutMetrics(
+        availableWidth: CGFloat,
+        nonSearchControlsWidth: CGFloat
+    ) -> (breadcrumbReservation: CGFloat, searchFieldMinimumWidth: CGFloat) {
+        let usableWidth = max(availableWidth - headerTrailingInset, 0)
+        let regularSearchWidth = headerRegularSearchFieldMinimumWidth
+        let compactSearchWidth = headerCompactSearchFieldMinimumWidth
+
+        let preferredBreadcrumbWidth = usableWidth - nonSearchControlsWidth - regularSearchWidth
+        if preferredBreadcrumbWidth >= headerPreferredBreadcrumbWidth {
+            return (headerPreferredBreadcrumbWidth, regularSearchWidth)
+        }
+
+        if preferredBreadcrumbWidth >= headerCompactBreadcrumbWidth {
+            return (preferredBreadcrumbWidth, regularSearchWidth)
+        }
+
+        let compactSearchCandidate = usableWidth - nonSearchControlsWidth - headerCompactBreadcrumbWidth
+        let searchFieldMinimumWidth = max(
+            headerAbsoluteSearchFieldMinimumWidth,
+            min(regularSearchWidth, max(compactSearchWidth, compactSearchCandidate))
+        )
+        let breadcrumbReservation = max(0, usableWidth - nonSearchControlsWidth - searchFieldMinimumWidth)
+        return (breadcrumbReservation, searchFieldMinimumWidth)
+    }
+
+    static func browserColumnWidths(
+        availableWidth: CGFloat,
+        intercellSpacing: CGFloat
+    ) -> (name: CGFloat, size: CGFloat, modified: CGFloat) {
+        let columnCount = CGFloat(3)
+        let totalSpacing = intercellSpacing * (columnCount - 1)
+        let availableColumnsWidth = max(availableWidth - totalSpacing, 0)
+
+        var nameWidth = browserNameColumnDefaultWidth
+        var sizeWidth = browserSizeColumnDefaultWidth
+        var modifiedWidth = browserModifiedColumnDefaultWidth
+        let desiredTotalWidth = nameWidth + sizeWidth + modifiedWidth
+
+        if availableColumnsWidth >= desiredTotalWidth {
+            nameWidth += availableColumnsWidth - desiredTotalWidth
+            return (nameWidth, sizeWidth, modifiedWidth)
+        }
+
+        var overflow = desiredTotalWidth - availableColumnsWidth
+
+        let modifiedReduction = min(overflow, modifiedWidth - browserModifiedColumnMinimumWidth)
+        modifiedWidth -= modifiedReduction
+        overflow -= modifiedReduction
+
+        let sizeReduction = min(overflow, sizeWidth - browserSizeColumnMinimumWidth)
+        sizeWidth -= sizeReduction
+        overflow -= sizeReduction
+
+        let nameReduction = min(overflow, nameWidth - browserNameColumnMinimumWidth)
+        nameWidth -= nameReduction
+        overflow -= nameReduction
+
+        if overflow > 0 {
+            let scale = availableColumnsWidth / max(nameWidth + sizeWidth + modifiedWidth, 1)
+            nameWidth = floor(nameWidth * scale)
+            sizeWidth = floor(sizeWidth * scale)
+            modifiedWidth = max(availableColumnsWidth - nameWidth - sizeWidth, 1)
+        }
+
+        return (nameWidth, sizeWidth, modifiedWidth)
     }
 
     private func configureCollectionView() {
@@ -1143,6 +1321,16 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
         searchControlsStackView.setCustomSpacing(4, after: mediaIconSizeSlider)
         searchControlsStackView.setCustomSpacing(12, after: mediaIconSizeValueLabel)
 
+        let searchControlsMinimumLeadingConstraint = searchControlsStackView.leadingAnchor.constraint(
+            greaterThanOrEqualTo: headerView.leadingAnchor,
+            constant: Self.headerPreferredBreadcrumbWidth
+        )
+        let searchFieldMinimumWidthConstraint = searchField.widthAnchor.constraint(
+            greaterThanOrEqualToConstant: Self.headerRegularSearchFieldMinimumWidth
+        )
+        self.searchControlsMinimumLeadingConstraint = searchControlsMinimumLeadingConstraint
+        self.searchFieldMinimumWidthConstraint = searchFieldMinimumWidthConstraint
+
         NSLayoutConstraint.activate([
             headerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             headerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -1153,19 +1341,19 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
             navigationStackView.trailingAnchor.constraint(lessThanOrEqualTo: searchControlsStackView.leadingAnchor, constant: -12),
             navigationStackView.centerYAnchor.constraint(equalTo: headerView.centerYAnchor),
 
-            searchControlsStackView.trailingAnchor.constraint(equalTo: headerView.trailingAnchor, constant: -8),
+            searchControlsStackView.trailingAnchor.constraint(equalTo: headerView.trailingAnchor, constant: -Self.headerTrailingInset),
             searchControlsStackView.centerYAnchor.constraint(equalTo: headerView.centerYAnchor),
-            searchControlsStackView.leadingAnchor.constraint(greaterThanOrEqualTo: headerView.leadingAnchor, constant: 280),
+            searchControlsMinimumLeadingConstraint,
             breadcrumbContainerView.topAnchor.constraint(equalTo: headerView.topAnchor),
             breadcrumbContainerView.bottomAnchor.constraint(equalTo: headerView.bottomAnchor),
             filesModeButton.heightAnchor.constraint(equalToConstant: 22),
-            filesModeButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 46),
+            filesModeButton.widthAnchor.constraint(greaterThanOrEqualToConstant: Self.filesModeButtonMinimumWidth),
             mediaModeButton.heightAnchor.constraint(equalToConstant: 22),
-            mediaModeButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 50),
+            mediaModeButton.widthAnchor.constraint(greaterThanOrEqualToConstant: Self.mediaModeButtonMinimumWidth),
             searchField.heightAnchor.constraint(equalToConstant: 22),
-            mediaIconSizeSlider.widthAnchor.constraint(equalToConstant: 110),
-            mediaIconSizeValueLabel.widthAnchor.constraint(equalToConstant: 44),
-            searchField.widthAnchor.constraint(greaterThanOrEqualToConstant: 132),
+            mediaIconSizeSlider.widthAnchor.constraint(equalToConstant: Self.mediaIconSizeSliderWidth),
+            mediaIconSizeValueLabel.widthAnchor.constraint(equalToConstant: Self.mediaIconSizeValueLabelWidth),
+            searchFieldMinimumWidthConstraint,
             searchField.widthAnchor.constraint(lessThanOrEqualToConstant: 240),
 
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -1244,6 +1432,7 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
         mediaRecursiveButton.isHidden = !isMediaMode
         mediaIconSizeSlider.isHidden = !isMediaMode
         mediaIconSizeValueLabel.isHidden = !isMediaMode
+        view.needsLayout = true
     }
 
     private func configureContextMenu() {

@@ -12,13 +12,19 @@
 		45DFBE0D6C1ABE4E2390F550 /* SecurityScopedBookmarkServiceIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02AAF2688F1616CD1D0FD85C /* SecurityScopedBookmarkServiceIntegrationTests.swift */; };
 		47039FE7ECB2C497486CAADD /* TaskCenterEntryRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D676FD68894D5E45182BC14 /* TaskCenterEntryRowView.swift */; };
 		609C81EFEC2EC739DF00A1A9 /* GlobalActionRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 060024D18787057241DAE6D4 /* GlobalActionRouterTests.swift */; };
+		626F8E19260923924729104A /* SyncStatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5FC66EF6861323A49DB7766 /* SyncStatusBarController.swift */; };
+		800C98774A959EE8EA064FB5 /* NetworkSyncModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = E28F978AA36BA979081BE837 /* NetworkSyncModels.swift */; };
 		817C3301D10A09566C8D98B5 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 060CBF0D5054826A7CCFB945 /* Cocoa.framework */; };
+		83A78FA84F9450863E849779 /* NetworkSyncSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3D9FF421A39B5F75121AF11 /* NetworkSyncSettingsViewController.swift */; };
 		893B9717C9949290E99BE6E0 /* DefaultShortcutCoverageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2533AA15ECD04A067DEC511D /* DefaultShortcutCoverageTests.swift */; };
 		8A3765E00AAE2C3258403B70 /* DragDropSmokeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 756FB87F81BD373FD51CB70A /* DragDropSmokeUITests.swift */; };
+		8A7EF9C9701927D028330EA9 /* SyncStatusPopoverViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B5EE3F03461C71A6E06F375 /* SyncStatusPopoverViewController.swift */; };
 		8E4331A82F9C8E9640C4A956 /* BaseUITestCase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DA02617092C30A871EDC359 /* BaseUITestCase.swift */; };
 		95DC124F2E566D7FC0F5A7E2 /* TaskCenterEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD55A301B5172AC835D08ACF /* TaskCenterEntry.swift */; };
+		9975337F833EC3A3DE4C5BED /* NetworkSyncViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F563A0DF2411E06F4D7012FD /* NetworkSyncViewModel.swift */; };
 		A044C0BCB493112E23403E93 /* ShortcutRegressionUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 230E7EDA0891551B6E0419BC /* ShortcutRegressionUITests.swift */; };
 		A6F98E73AAE0447658073E71 /* SandboxFixtureWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 625BBF22ED7C8DF9F963DCEE /* SandboxFixtureWorkspace.swift */; };
+		A71C439AA3EC244DCEAA171B /* NetworkSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136234B68464371CF5FC3301 /* NetworkSyncService.swift */; };
 		BA1730EC76F454E2A789144E /* FileOperationServiceIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8744C2A33062020B5AC45A7 /* FileOperationServiceIntegrationTests.swift */; };
 		CC0000000000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000001 /* AppDelegate.swift */; };
 		CC0000000000000000000002 /* MainWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000002 /* MainWindowController.swift */; };
@@ -159,6 +165,7 @@
 		EE000000000000000000A002 /* TestURLFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF000000000000000000A002 /* TestURLFactory.swift */; };
 		EE000000000000000000A003 /* AsyncTestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF000000000000000000A003 /* AsyncTestHelpers.swift */; };
 		EE000000000000000000A004 /* MockPinnedItemsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF000000000000000000A004 /* MockPinnedItemsService.swift */; };
+		F016B2D6D61C5A95006BC61B /* NetworkSyncConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34E6D910DB48D66D13C3A506 /* NetworkSyncConfig.swift */; };
 		F62B990D1CDE6CB6E6DB412B /* TaskCenterPopoverViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 203ECE8A9D19B20DB7058AB6 /* TaskCenterPopoverViewController.swift */; };
 /* End PBXBuildFile section */
 
@@ -183,16 +190,20 @@
 		02AAF2688F1616CD1D0FD85C /* SecurityScopedBookmarkServiceIntegrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SecurityScopedBookmarkServiceIntegrationTests.swift; sourceTree = "<group>"; };
 		060024D18787057241DAE6D4 /* GlobalActionRouterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GlobalActionRouterTests.swift; sourceTree = "<group>"; };
 		060CBF0D5054826A7CCFB945 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
+		136234B68464371CF5FC3301 /* NetworkSyncService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Sync/NetworkSyncService.swift; sourceTree = "<group>"; };
 		1DA02617092C30A871EDC359 /* BaseUITestCase.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BaseUITestCase.swift; sourceTree = "<group>"; };
 		203ECE8A9D19B20DB7058AB6 /* TaskCenterPopoverViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskCenterPopoverViewController.swift; sourceTree = "<group>"; };
 		230E7EDA0891551B6E0419BC /* ShortcutRegressionUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShortcutRegressionUITests.swift; sourceTree = "<group>"; };
 		2533AA15ECD04A067DEC511D /* DefaultShortcutCoverageTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DefaultShortcutCoverageTests.swift; sourceTree = "<group>"; };
+		34E6D910DB48D66D13C3A506 /* NetworkSyncConfig.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NetworkSyncConfig.swift; sourceTree = "<group>"; };
 		3D676FD68894D5E45182BC14 /* TaskCenterEntryRowView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskCenterEntryRowView.swift; sourceTree = "<group>"; };
 		625BBF22ED7C8DF9F963DCEE /* SandboxFixtureWorkspace.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SandboxFixtureWorkspace.swift; sourceTree = "<group>"; };
 		756FB87F81BD373FD51CB70A /* DragDropSmokeUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DragDropSmokeUITests.swift; sourceTree = "<group>"; };
 		7A274C82907F638E806D82CD /* TaskCenterViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskCenterViewModel.swift; sourceTree = "<group>"; };
 		876B6E0CED4A9C9FCAB9CF9C /* FileSystemServiceIntegrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileSystemServiceIntegrationTests.swift; sourceTree = "<group>"; };
+		8B5EE3F03461C71A6E06F375 /* SyncStatusPopoverViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncStatusBar/SyncStatusPopoverViewController.swift; sourceTree = "<group>"; };
 		A8744C2A33062020B5AC45A7 /* FileOperationServiceIntegrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileOperationServiceIntegrationTests.swift; sourceTree = "<group>"; };
+		B3D9FF421A39B5F75121AF11 /* NetworkSyncSettingsViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NetworkSyncSettingsViewController.swift; sourceTree = "<group>"; };
 		BB0000000000000000000001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		BB0000000000000000000002 /* MainWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowController.swift; sourceTree = "<group>"; };
 		BB0000000000000000000003 /* FilePaneViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePaneViewController.swift; sourceTree = "<group>"; };
@@ -300,10 +311,13 @@
 		BB0000000000000000000079 /* TerminalSessionManagerWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSessionManagerWindowController.swift; sourceTree = "<group>"; };
 		BCA70B511E56E61D85B994DC /* FeatureRegressionUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeatureRegressionUITests.swift; sourceTree = "<group>"; };
 		BD55A301B5172AC835D08ACF /* TaskCenterEntry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskCenterEntry.swift; sourceTree = "<group>"; };
+		D5FC66EF6861323A49DB7766 /* SyncStatusBarController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncStatusBar/SyncStatusBarController.swift; sourceTree = "<group>"; };
 		DB62D59F8B8F0D0859950655 /* GlobalActionRouter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GlobalActionRouter.swift; sourceTree = "<group>"; };
 		DD000000000000000000001A /* TerminalSessionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSessionServiceTests.swift; sourceTree = "<group>"; };
 		DD000000000000000000001B /* TerminalSessionManagerViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSessionManagerViewModelTests.swift; sourceTree = "<group>"; };
 		E0EA844564F4E9B8E81C9467 /* starfilerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = starfilerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E28F978AA36BA979081BE837 /* NetworkSyncModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Sync/NetworkSyncModels.swift; sourceTree = "<group>"; };
+		F563A0DF2411E06F4D7012FD /* NetworkSyncViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NetworkSyncViewModel.swift; sourceTree = "<group>"; };
 		FF0000000000000000000001 /* NavigationHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationHistoryTests.swift; sourceTree = "<group>"; };
 		FF0000000000000000000002 /* DirectoryContentsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectoryContentsTests.swift; sourceTree = "<group>"; };
 		FF0000000000000000000003 /* PaneStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneStateTests.swift; sourceTree = "<group>"; };
@@ -367,6 +381,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		285F46BCC0162096C9B84E56 /* SyncStatusBar */ = {
+			isa = PBXGroup;
+			children = (
+				D5FC66EF6861323A49DB7766 /* SyncStatusBarController.swift */,
+				8B5EE3F03461C71A6E06F375 /* SyncStatusPopoverViewController.swift */,
+			);
+			name = SyncStatusBar;
+			sourceTree = "<group>";
+		};
 		64374B081BA97E70D0FB8B04 /* OS X */ = {
 			isa = PBXGroup;
 			children = (
@@ -390,6 +413,15 @@
 				64374B081BA97E70D0FB8B04 /* OS X */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		9F923F3DA9120D6646AA700B /* Sync */ = {
+			isa = PBXGroup;
+			children = (
+				E28F978AA36BA979081BE837 /* NetworkSyncModels.swift */,
+				136234B68464371CF5FC3301 /* NetworkSyncService.swift */,
+			);
+			name = Sync;
 			sourceTree = "<group>";
 		};
 		AA0000000000000000000001 = {
@@ -471,6 +503,7 @@
 				AA0000000000000000000036 /* MarkdownPreview */,
 				AA0000000000000000000037 /* Terminal */,
 				65590A6DDB49E9F765915A72 /* TaskCenter */,
+				285F46BCC0162096C9B84E56 /* SyncStatusBar */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -512,6 +545,7 @@
 				BB0000000000000000000050 /* TerminalSessionViewModel.swift */,
 				BB0000000000000000000076 /* TerminalSessionManagerViewModel.swift */,
 				7A274C82907F638E806D82CD /* TaskCenterViewModel.swift */,
+				F563A0DF2411E06F4D7012FD /* NetworkSyncViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -532,6 +566,7 @@
 				BB000000000000000000004A /* ApplicationRelatedItemLocatorService.swift */,
 				BB000000000000000000004E /* TerminalSessionService.swift */,
 				BB0000000000000000000074 /* PinnedItemsService.swift */,
+				9F923F3DA9120D6646AA700B /* Sync */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -608,6 +643,7 @@
 				BB000000000000000000003D /* VisitHistoryConfig.swift */,
 				BB0000000000000000000072 /* PinnedItemsConfig.swift */,
 				BB0000000000000000000075 /* TerminalSessionsConfig.swift */,
+				34E6D910DB48D66D13C3A506 /* NetworkSyncConfig.swift */,
 			);
 			path = Config;
 			sourceTree = "<group>";
@@ -671,6 +707,7 @@
 				BB0000000000000000000045 /* KeyRecorderView.swift */,
 				BB0000000000000000000046 /* BookmarksSettingsViewController.swift */,
 				BB0000000000000000000047 /* AdvancedSettingsViewController.swift */,
+				B3D9FF421A39B5F75121AF11 /* NetworkSyncSettingsViewController.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -1099,6 +1136,13 @@
 				D2D7B2A18F78C9CD87D8BA4B /* TaskCenterViewModel.swift in Sources */,
 				F62B990D1CDE6CB6E6DB412B /* TaskCenterPopoverViewController.swift in Sources */,
 				47039FE7ECB2C497486CAADD /* TaskCenterEntryRowView.swift in Sources */,
+				F016B2D6D61C5A95006BC61B /* NetworkSyncConfig.swift in Sources */,
+				9975337F833EC3A3DE4C5BED /* NetworkSyncViewModel.swift in Sources */,
+				83A78FA84F9450863E849779 /* NetworkSyncSettingsViewController.swift in Sources */,
+				626F8E19260923924729104A /* SyncStatusBarController.swift in Sources */,
+				8A7EF9C9701927D028330EA9 /* SyncStatusPopoverViewController.swift in Sources */,
+				800C98774A959EE8EA064FB5 /* NetworkSyncModels.swift in Sources */,
+				A71C439AA3EC244DCEAA171B /* NetworkSyncService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

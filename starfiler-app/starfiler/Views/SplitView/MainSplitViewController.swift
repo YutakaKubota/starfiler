@@ -236,6 +236,7 @@ final class MainSplitViewController: NSSplitViewController, NSPopoverDelegate {
     private let initialSidebarWidth: CGFloat
     private var hasAppliedInitialSidebarWidth = false
     private var lastReportedSidebarWidth: CGFloat
+    private var isAdjustingSplitLayout = false
     private let toastPresenter = ActionToastPresenter()
     private let globalActionRouter = GlobalActionRouter()
     private let applicationRelatedItemLocator: any ApplicationRelatedItemLocating = ApplicationRelatedItemLocatorService()
@@ -364,10 +365,12 @@ final class MainSplitViewController: NSSplitViewController, NSPopoverDelegate {
     override func viewDidLayout() {
         super.viewDidLayout()
         applyInitialSidebarWidthIfNeeded()
+        adjustSplitLayoutIfNeeded()
     }
 
     override func splitViewDidResizeSubviews(_ notification: Notification) {
         super.splitViewDidResizeSubviews(notification)
+        adjustSplitLayoutIfNeeded()
         reportSidebarWidthIfNeeded(force: false)
     }
 
@@ -1380,6 +1383,58 @@ final class MainSplitViewController: NSSplitViewController, NSPopoverDelegate {
         reportSidebarWidthIfNeeded(force: true)
     }
 
+    private func adjustSplitLayoutIfNeeded() {
+        guard !isAdjustingSplitLayout else {
+            return
+        }
+
+        let arrangedSubviews = splitView.arrangedSubviews
+        guard !arrangedSubviews.isEmpty else {
+            return
+        }
+
+        isAdjustingSplitLayout = true
+        defer { isAdjustingSplitLayout = false }
+
+        if !sidebarSplitItem.isCollapsed,
+           let sidebarIndex = arrangedSubviewIndex(for: sidebarViewController.view, in: arrangedSubviews),
+           sidebarIndex < arrangedSubviews.count - 1 {
+            let currentSidebarWidth = arrangedSubviews[sidebarIndex].frame.width
+            let maximumSidebarWidth = maximumAllowedSidebarWidth(for: arrangedSubviews)
+            let clampedSidebarWidth = min(currentSidebarWidth, maximumSidebarWidth)
+            if abs(clampedSidebarWidth - currentSidebarWidth) >= 1 {
+                splitView.setPosition(clampedSidebarWidth, ofDividerAt: sidebarIndex)
+            }
+        }
+
+        guard !leftSplitItem.isCollapsed,
+              !rightSplitItem.isCollapsed else {
+            return
+        }
+
+        let updatedSubviews = splitView.arrangedSubviews
+        guard let leftIndex = arrangedSubviewIndex(for: leftPaneViewController.view, in: updatedSubviews),
+              let rightIndex = arrangedSubviewIndex(for: rightPaneViewController.view, in: updatedSubviews),
+              rightIndex == leftIndex + 1 else {
+            return
+        }
+
+        let leftMinX = updatedSubviews[leftIndex].frame.minX
+        let rightMaxX = updatedSubviews[rightIndex].frame.maxX
+        let currentDividerPosition = updatedSubviews[leftIndex].frame.maxX
+        let minimumDividerPosition = leftMinX + leftSplitItem.minimumThickness
+        let maximumDividerPosition = rightMaxX - splitView.dividerThickness - rightSplitItem.minimumThickness
+
+        guard maximumDividerPosition >= minimumDividerPosition else {
+            return
+        }
+
+        let clampedDividerPosition = min(max(currentDividerPosition, minimumDividerPosition), maximumDividerPosition)
+        if abs(clampedDividerPosition - currentDividerPosition) >= 1 {
+            splitView.setPosition(clampedDividerPosition, ofDividerAt: leftIndex)
+        }
+    }
+
     private func restoreSidebarWidthIfNeeded() {
         guard !sidebarSplitItem.isCollapsed, splitView.arrangedSubviews.count > 1 else {
             return
@@ -1404,6 +1459,21 @@ final class MainSplitViewController: NSSplitViewController, NSPopoverDelegate {
 
     private static func clampedSidebarWidth(_ width: CGFloat) -> CGFloat {
         min(max(width, sidebarWidthRange.lowerBound), sidebarWidthRange.upperBound)
+    }
+
+    private func maximumAllowedSidebarWidth(for arrangedSubviews: [NSView]) -> CGFloat {
+        let dividerCount = max(arrangedSubviews.count - 1, 0)
+        let visiblePaneMinimumWidths =
+            (!leftSplitItem.isCollapsed ? leftSplitItem.minimumThickness : 0) +
+            (!rightSplitItem.isCollapsed ? rightSplitItem.minimumThickness : 0)
+        let availableSidebarWidth = splitView.bounds.width
+            - (CGFloat(dividerCount) * splitView.dividerThickness)
+            - visiblePaneMinimumWidths
+
+        return min(
+            Self.sidebarWidthRange.upperBound,
+            max(Self.sidebarWidthRange.lowerBound, availableSidebarWidth)
+        )
     }
 
     private func presentTextPrompt(_ prompt: TextInputPrompt) -> String? {

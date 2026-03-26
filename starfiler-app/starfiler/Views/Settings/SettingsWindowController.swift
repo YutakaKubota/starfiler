@@ -3,20 +3,36 @@ import AppKit
 final class SettingsWindowController: NSWindowController {
     private let tabViewController = NSTabViewController()
 
-    init(
+    convenience init(
         appearanceVC: AppearanceSettingsViewController,
         keybindingsVC: KeybindingsViewController,
         bookmarksVC: BookmarksSettingsViewController,
         advancedVC: AdvancedSettingsViewController
     ) {
+        self.init(
+            appearanceVC: appearanceVC,
+            keybindingsVC: keybindingsVC,
+            bookmarksVC: bookmarksVC,
+            networkSyncVC: NetworkSyncSettingsViewController(),
+            advancedVC: advancedVC
+        )
+    }
+
+    init(
+        appearanceVC: AppearanceSettingsViewController,
+        keybindingsVC: KeybindingsViewController,
+        bookmarksVC: BookmarksSettingsViewController,
+        networkSyncVC: NetworkSyncSettingsViewController,
+        advancedVC: AdvancedSettingsViewController
+    ) {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 640, height: 500),
+            contentRect: NSRect(x: 0, y: 0, width: 760, height: 620),
             styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Settings"
-        window.minSize = NSSize(width: 500, height: 400)
+        window.minSize = NSSize(width: 680, height: 520)
 
         super.init(window: window)
 
@@ -34,6 +50,10 @@ final class SettingsWindowController: NSWindowController {
         bookmarksItem.label = "Bookmarks"
         bookmarksItem.image = NSImage(systemSymbolName: "bookmark", accessibilityDescription: "Bookmarks")
 
+        let networkSyncItem = NSTabViewItem(viewController: networkSyncVC)
+        networkSyncItem.label = "Network Sync"
+        networkSyncItem.image = NSImage(systemSymbolName: "icloud.and.arrow.down", accessibilityDescription: "Network Sync")
+
         let advancedItem = NSTabViewItem(viewController: advancedVC)
         advancedItem.label = "Advanced"
         advancedItem.image = NSImage(systemSymbolName: "gearshape.2", accessibilityDescription: "Advanced")
@@ -41,6 +61,7 @@ final class SettingsWindowController: NSWindowController {
         tabViewController.addTabViewItem(appearanceItem)
         tabViewController.addTabViewItem(keybindingsItem)
         tabViewController.addTabViewItem(bookmarksItem)
+        tabViewController.addTabViewItem(networkSyncItem)
         tabViewController.addTabViewItem(advancedItem)
 
         window.contentViewController = tabViewController

@@ -35,9 +35,15 @@
             </array>
         </dict>
     </array>
-    <key>LSMinimumSystemVersion</key>
-    <string>15.0</string>
-    <key>NSPrincipalClass</key>
-    <string>NSApplication</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>15.0</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_starfiler-sync._tcp</string>
+	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Starfiler uses the local network to discover sync peers and transfer files between your Macs.</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
 </dict>
 </plist>

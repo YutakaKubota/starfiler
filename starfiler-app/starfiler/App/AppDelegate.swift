@@ -60,12 +60,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let launchOptions = LaunchOptions()
     private var mainWindowController: MainWindowController?
     private var settingsWindowController: SettingsWindowController?
+    private var syncStatusBarController: SyncStatusBarController?
+    private var networkSyncViewModel: NetworkSyncViewModel?
     private var launchTask: Task<Void, Never>?
     private var pendingOpenDirectories: [URL] = []
     private var fileClipboardChangeCount: Int?
     private let securityScopedBookmarkService: any SecurityScopedBookmarkProviding = SecurityScopedBookmarkService.shared
     private lazy var activeSecurityScopedBookmarkService: any SecurityScopedBookmarkProviding = {
         launchOptions.isUITest ? UITestSecurityScopedBookmarkService() : securityScopedBookmarkService
+    }()
+    private lazy var sharedConfigManager: ConfigManager = {
+        makeConfigManagerOverride() ?? ConfigManager()
     }()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -77,7 +82,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        true
+        !(networkSyncViewModel?.isEnabled ?? false)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        networkSyncViewModel?.stop()
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -105,16 +114,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
 
             let initialDirectory = launchOptions.sandboxRoot ?? UserPaths.homeDirectoryURL
-            let configManager = makeConfigManagerOverride()
             let controller = MainWindowController(
                 securityScopedBookmarkService: activeSecurityScopedBookmarkService,
                 initialDirectory: initialDirectory,
-                configManager: configManager,
+                configManager: sharedConfigManager,
                 disableAnimations: launchOptions.disableAnimations,
                 persistLaunchMetadata: !launchOptions.isUITest
             )
             mainWindowController = controller
             controller.showWindow(self)
+            configureNetworkSyncIfNeeded()
             processPendingOpenDirectories()
 
             NSApp.activate(ignoringOtherApps: true)
@@ -628,10 +637,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mainWindowController?.toggleSessionManager()
     }
 
+    @MainActor
     @objc private func menuShowSettings(_ sender: Any?) {
         presentSettingsWindow()
     }
 
+    @MainActor
+    private func configureNetworkSyncIfNeeded() {
+        guard networkSyncViewModel == nil else {
+            syncStatusBarController?.refresh()
+            return
+        }
+
+        let viewModel = NetworkSyncViewModel(
+            configManager: sharedConfigManager,
+            securityScopedBookmarkService: activeSecurityScopedBookmarkService
+        )
+        let statusBarController = SyncStatusBarController(viewModel: viewModel)
+        statusBarController.onOpenSettingsRequested = { [weak self] in
+            self?.presentSettingsWindow()
+        }
+
+        self.networkSyncViewModel = viewModel
+        self.syncStatusBarController = statusBarController
+    }
+
+    @MainActor
     private func presentSettingsWindow() {
         if let existing = settingsWindowController {
             existing.showWindow(self)
@@ -721,10 +752,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil)
         }
 
+        let resolvedNetworkSyncViewModel: NetworkSyncViewModel
+        if let existing = networkSyncViewModel {
+            resolvedNetworkSyncViewModel = existing
+        } else {
+            let created = NetworkSyncViewModel(
+                configManager: sharedConfigManager,
+                securityScopedBookmarkService: activeSecurityScopedBookmarkService
+            )
+            networkSyncViewModel = created
+            resolvedNetworkSyncViewModel = created
+        }
+
+        let networkSyncVC = NetworkSyncSettingsViewController(viewModel: resolvedNetworkSyncViewModel)
+
         let controller = SettingsWindowController(
             appearanceVC: appearanceVC,
             keybindingsVC: keybindingsVC,
             bookmarksVC: bookmarksVC,
+            networkSyncVC: networkSyncVC,
             advancedVC: advancedVC
         )
         controller.showWindow(self)
