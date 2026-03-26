@@ -159,7 +159,7 @@ struct NetworkSyncConfig: Codable, Sendable {
     var peers: [NetworkSyncPeerConfig]
 
     static var defaultClientRootPath: String {
-        UserPaths.homeDirectoryPath + "/StarFilerSync"
+        "~/StarFilerSync"
     }
 
     var effectiveRootPath: String {
