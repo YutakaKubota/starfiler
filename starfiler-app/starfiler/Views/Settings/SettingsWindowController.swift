@@ -3,7 +3,7 @@ import AppKit
 final class SettingsWindowController: NSWindowController {
     private let tabViewController = NSTabViewController()
 
-    init(
+    convenience init(
         appearanceVC: AppearanceSettingsViewController,
         keybindingsVC: KeybindingsViewController,
         bookmarksVC: BookmarksSettingsViewController,

@@ -58,6 +58,7 @@ struct SyncTransferSummary: Hashable, Sendable {
     let detail: String
 }
 
+@MainActor
 protocol SyncStatusBarPresenting: AnyObject {
     var statusLevel: SyncStatusLevel { get }
     var statusTitle: String { get }

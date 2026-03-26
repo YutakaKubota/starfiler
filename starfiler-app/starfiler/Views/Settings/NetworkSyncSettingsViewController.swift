@@ -1,5 +1,6 @@
 import AppKit
 
+@MainActor
 final class NetworkSyncSettingsViewController: NSViewController {
     private let viewModel: NetworkSyncViewModel
 
@@ -25,8 +26,8 @@ final class NetworkSyncSettingsViewController: NSViewController {
     private let saveButton = NSButton(title: "Save", target: nil, action: nil)
     private let reloadButton = NSButton(title: "Reload", target: nil, action: nil)
 
-    init(viewModel: NetworkSyncViewModel = NetworkSyncViewModel()) {
-        self.viewModel = viewModel
+    init(viewModel: NetworkSyncViewModel? = nil) {
+        self.viewModel = viewModel ?? NetworkSyncViewModel()
         super.init(nibName: nil, bundle: nil)
     }
 
