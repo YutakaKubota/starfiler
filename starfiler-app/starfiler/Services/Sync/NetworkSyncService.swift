@@ -686,9 +686,14 @@ final class NetworkSyncService: NetworkSyncControlling {
         guard let rootURL else { return }
 
         let currentEntry = serverState.entries[incoming.start.relativePath]
-        let payloadHash = hash ?? sha256Hex(for: incoming.data)
+        let payloadHash: String? = incoming.start.isDirectory ? nil : (hash ?? sha256Hex(for: incoming.data))
         let hasRevisionConflict = currentEntry.map { $0.revision != incoming.start.baseRevision } ?? (incoming.start.baseRevision != 0)
-        let sameContent = currentEntry?.contentHash == payloadHash && currentEntry?.deleted == false
+        let sameContent: Bool
+        if incoming.start.isDirectory {
+            sameContent = currentEntry?.isDirectory == true && currentEntry?.deleted == false
+        } else {
+            sameContent = currentEntry?.contentHash == payloadHash && currentEntry?.deleted == false
+        }
 
         if hasRevisionConflict && !sameContent {
             let conflictPath = conflictRelativePath(for: incoming.start.relativePath, peerName: context.hello?.displayName ?? "Client")
@@ -1111,6 +1116,11 @@ final class NetworkSyncService: NetworkSyncControlling {
     private func metadataEquivalent(_ lhs: NetworkSyncFileEntry?, _ rhs: NetworkSyncFileEntry?) -> Bool {
         guard let lhs, let rhs else {
             return lhs == nil && rhs == nil
+        }
+
+        if lhs.isDirectory && rhs.isDirectory {
+            return lhs.relativePath == rhs.relativePath &&
+                lhs.deleted == rhs.deleted
         }
 
         return lhs.relativePath == rhs.relativePath &&
