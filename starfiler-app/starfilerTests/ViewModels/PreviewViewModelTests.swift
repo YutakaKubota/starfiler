@@ -78,6 +78,25 @@ final class PreviewViewModelTests: XCTestCase {
         XCTAssertEqual(sut.state.selectedFileURL, pkg.url)
     }
 
+    func testUpdateContextIncludesAudioFilesInSiblingMediaItems() {
+        let sut = PreviewViewModel()
+        let audio = makeFileItem(name: "theme.mp3")
+        let image = makeFileItem(name: "cover.jpg")
+        let text = makeFileItem(name: "notes.txt")
+        let directoryURL = URL(fileURLWithPath: "/tmp/test")
+
+        sut.updateContext(
+            selectedItem: audio,
+            currentDirectoryURL: directoryURL,
+            displayedItems: [audio, image, text]
+        )
+
+        XCTAssertEqual(
+            Set(sut.state.siblingMediaURLs.map(\.lastPathComponent)),
+            Set(["cover.jpg", "theme.mp3"])
+        )
+    }
+
     func testSetSelectedFileURLUpdatesState() {
         let sut = PreviewViewModel()
         let url = URL(fileURLWithPath: "/tmp/test/file.txt")

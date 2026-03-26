@@ -617,6 +617,9 @@ final class MainSplitViewController: NSSplitViewController, NSPopoverDelegate {
         pane.onSelectionChanged = { [weak self] _ in
             self?.viewModel.updatePreviewSelection(for: side)
         }
+        pane.onInlineMediaPlaybackRequested = { [weak self] in
+            self?.startInlineMediaPlayback(for: side)
+        }
         pane.onDisplayedItemsChanged = { [weak self] in
             guard let self, self.viewModel.activePaneSide == side else {
                 return
@@ -710,6 +713,19 @@ final class MainSplitViewController: NSSplitViewController, NSPopoverDelegate {
 
         viewModel.setActivePane(side)
         refreshActivePaneUI(focusActivePane: false)
+    }
+
+    private func startInlineMediaPlayback(for side: PaneSide) {
+        setActivePane(side)
+        viewModel.updatePreviewSelection(for: side)
+
+        guard isPreviewableSelectionAvailableForActivePane() else {
+            NSSound.beep()
+            return
+        }
+
+        viewModel.previewVisible = true
+        applyPreviewPaneVisibility(animated: false)
     }
 
     private func handleGlobalAction(_ action: KeyAction) -> Bool {
@@ -1068,7 +1084,7 @@ final class MainSplitViewController: NSSplitViewController, NSPopoverDelegate {
             return false
         }
 
-        return selectedItem.url.isImageFile
+        return selectedItem.url.isMediaFile
     }
 
     private func handlePreviewSelectionStep(_ step: PreviewSelectionStep) -> Bool {

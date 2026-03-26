@@ -23,7 +23,7 @@ final class PreviewPaneViewController: NSViewController {
     private let scrollView = NSScrollView()
     private let playerView = AVPlayerView()
     private let imageView = NSImageView()
-    private let emptyStateLabel = NSTextField(labelWithString: "Select an image or video file")
+    private let emptyStateLabel = NSTextField(labelWithString: "Select a media file")
 
     private var currentTheme: FilerTheme = .system
     private var backgroundOpacity: CGFloat = 1.0
@@ -332,11 +332,11 @@ final class PreviewPaneViewController: NSViewController {
         }
 
         if selectedFileURL != nil, !selectedIsMedia {
-            setCurrentMedia(item: nil, notifySelection: false, message: "Media preview supports images and videos.")
+            setCurrentMedia(item: nil, notifySelection: false, message: "Media preview supports images, videos, and audio.")
             return
         }
 
-        let fallbackMessage = currentMediaItems.isEmpty ? "No media files found" : "Media preview supports images and videos."
+        let fallbackMessage = currentMediaItems.isEmpty ? "No media files found" : "Media preview supports images, videos, and audio."
         setCurrentMedia(item: nil, notifySelection: false, message: fallbackMessage)
     }
 
@@ -362,8 +362,8 @@ final class PreviewPaneViewController: NSViewController {
 
         if url.isImageFile {
             loadAndDisplayImage(from: item)
-        } else if url.isVideoFile {
-            displayVideo(from: url)
+        } else if url.isVideoFile || url.isAudioFile {
+            displayAVMedia(from: url)
         } else {
             setCurrentMedia(item: nil, notifySelection: notifySelection, message: "Unsupported media format")
             return
@@ -471,7 +471,7 @@ final class PreviewPaneViewController: NSViewController {
         prefetchAroundCurrentImage()
     }
 
-    private func displayVideo(from url: URL) {
+    private func displayAVMedia(from url: URL) {
         imageLoadTask?.cancel()
         imageView.image = nil
         scrollView.isHidden = true

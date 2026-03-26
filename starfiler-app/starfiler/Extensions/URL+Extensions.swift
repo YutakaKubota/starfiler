@@ -451,6 +451,10 @@ extension URL {
         "mp4", "mov", "m4v", "avi", "mkv", "webm", "wmv", "mpg", "mpeg", "3gp", "m2ts"
     ]
 
+    private static let mediaAudioExtensionWhitelist: Set<String> = [
+        "mp3", "wav"
+    ]
+
     var isDirectory: Bool {
         (try? resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
     }
@@ -489,8 +493,21 @@ extension URL {
         return Self.mediaVideoExtensionWhitelist.contains(lowercasedExtension)
     }
 
+    var isAudioFile: Bool {
+        if hasDirectoryPath {
+            return false
+        }
+
+        let lowercasedExtension = pathExtension.lowercased()
+        guard !lowercasedExtension.isEmpty else {
+            return false
+        }
+
+        return Self.mediaAudioExtensionWhitelist.contains(lowercasedExtension)
+    }
+
     var isMediaFile: Bool {
-        isImageFile || isVideoFile
+        isImageFile || isVideoFile || isAudioFile
     }
 
     var isMarkdownFile: Bool {

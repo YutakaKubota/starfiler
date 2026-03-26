@@ -69,6 +69,8 @@ final class FileSystemServiceIntegrationTests: XCTestCase {
 
     func testMediaItemsFiltersByMediaExtensions() async throws {
         let workspace = try SandboxFixtureWorkspace()
+        try Data("mp3 fixture".utf8).write(to: workspace.url("left/media/theme.mp3"))
+        try Data("wav fixture".utf8).write(to: workspace.url("left/media/click.wav"))
         let sut = FileSystemService()
 
         let nonRecursive = try await sut.mediaItems(
@@ -77,7 +79,7 @@ final class FileSystemServiceIntegrationTests: XCTestCase {
             includeHiddenFiles: true
         )
 
-        XCTAssertEqual(Set(nonRecursive.map(\.name)), Set(["photo.jpg", "video.mp4"]))
+        XCTAssertEqual(Set(nonRecursive.map(\.name)), Set(["click.wav", "photo.jpg", "theme.mp3", "video.mp4"]))
     }
 
     func testMediaItemsRecursiveFindsNestedMediaFiles() async throws {
@@ -122,6 +124,8 @@ final class FileSystemServiceIntegrationTests: XCTestCase {
 
     func testMediaItemsDoesNotTreatTypeScriptAsMedia() async throws {
         let workspace = try SandboxFixtureWorkspace()
+        try Data("mp3 fixture".utf8).write(to: workspace.url("left/media/theme.mp3"))
+        try Data("wav fixture".utf8).write(to: workspace.url("left/media/click.wav"))
         try "const answer: number = 42".write(
             to: workspace.url("left/media/script.ts"),
             atomically: true,
@@ -135,12 +139,14 @@ final class FileSystemServiceIntegrationTests: XCTestCase {
             includeHiddenFiles: true
         )
 
-        XCTAssertEqual(Set(nonRecursive.map(\.name)), Set(["photo.jpg", "video.mp4"]))
+        XCTAssertEqual(Set(nonRecursive.map(\.name)), Set(["click.wav", "photo.jpg", "theme.mp3", "video.mp4"]))
         XCTAssertFalse(nonRecursive.contains(where: { $0.name == "script.ts" }))
     }
 
     func testMediaItemsUsesWhitelistAndExcludesMTS() async throws {
         let workspace = try SandboxFixtureWorkspace()
+        try Data("mp3 fixture".utf8).write(to: workspace.url("left/media/theme.mp3"))
+        try Data("wav fixture".utf8).write(to: workspace.url("left/media/click.wav"))
         try "transport stream fixture".write(
             to: workspace.url("left/media/capture.mts"),
             atomically: true,
@@ -154,7 +160,7 @@ final class FileSystemServiceIntegrationTests: XCTestCase {
             includeHiddenFiles: true
         )
 
-        XCTAssertEqual(Set(nonRecursive.map(\.name)), Set(["photo.jpg", "video.mp4"]))
+        XCTAssertEqual(Set(nonRecursive.map(\.name)), Set(["click.wav", "photo.jpg", "theme.mp3", "video.mp4"]))
         XCTAssertFalse(nonRecursive.contains(where: { $0.name == "capture.mts" }))
     }
 }

@@ -45,6 +45,14 @@ extension FilePaneViewController {
         viewModel.clearMarks()
         rangeSelectionAnchorIndex = indexPath.item
         viewModel.setCursor(index: indexPath.item)
+
+        if
+            currentDisplayMode == .media,
+            viewModel.directoryContents.displayedItems.indices.contains(indexPath.item),
+            viewModel.directoryContents.displayedItems[indexPath.item].url.isAudioFile
+        {
+            onInlineMediaPlaybackRequested?()
+        }
     }
 
     func collectionView(_ collectionView: NSCollectionView, didDeselectItemsAt _: Set<IndexPath>) {

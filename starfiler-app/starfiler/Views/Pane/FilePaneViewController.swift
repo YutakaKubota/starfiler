@@ -335,6 +335,7 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
     var onSpotlightSearchScopeChanged: ((SpotlightSearchScope) -> Void)?
     var onFileIconSizeChanged: ((CGFloat) -> Void)?
     var onMarkdownPreviewRequested: (([URL]) -> Void)?
+    var onInlineMediaPlaybackRequested: (() -> Void)?
     var onDirectoryLoadFailed: ((URL, Error) -> Void)?
 
     init(viewModel: FilePaneViewModel) {
@@ -1907,6 +1908,8 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
 
         if item.isDirectory && !item.isPackage {
             viewModel.enterSelected()
+        } else if item.url.isAudioFile {
+            onInlineMediaPlaybackRequested?()
         } else if item.url.isMarkdownFile {
             let markdownURLs = viewModel.markedOrSelectedURLs()
                 .filter(\.isMarkdownFile)
