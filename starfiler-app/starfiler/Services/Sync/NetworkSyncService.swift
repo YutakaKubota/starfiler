@@ -1,5 +1,6 @@
 import CoreServices
 import CryptoKit
+import AppKit
 import Foundation
 import Network
 
@@ -100,7 +101,7 @@ final class NetworkSyncService: NetworkSyncControlling {
             return
         }
 
-        let trimmedRoot = config.rootPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedRoot = config.effectiveRootPath.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedRoot.isEmpty else {
             setError("Set a sync root path in Network Sync settings.")
             return
@@ -115,7 +116,7 @@ final class NetworkSyncService: NetworkSyncControlling {
                 self.activeRootAccessURL = rootURL
                 self.rootURL = rootURL
 
-                if self.config.mode == .server, !self.fileManager.fileExists(atPath: rootURL.path) {
+                if !self.fileManager.fileExists(atPath: rootURL.path) {
                     try self.fileManager.createDirectory(at: rootURL, withIntermediateDirectories: true)
                 }
 
@@ -123,20 +124,24 @@ final class NetworkSyncService: NetworkSyncControlling {
                 self.snapshot.detail = "Starting \(self.config.mode.displayName.lowercased())…"
                 self.publishSnapshot()
 
-                self.localSnapshot = try self.scanEntries(at: rootURL)
-                self.startPathMonitor(for: rootURL)
-                self.startHeartbeat()
-
                 switch self.config.mode {
                 case .server:
+                    self.localSnapshot = try self.scanEntries(at: rootURL)
+                    self.startPathMonitor(for: rootURL)
+                    self.startHeartbeat()
                     try self.loadServerState()
                     try self.reconcileServerStateWithDisk(broadcast: false, originDeviceID: nil)
                     try self.startServerListener()
                     self.updateStatus(.idle, detail: "Server is advertising on the local network.")
                 case .client:
                     self.loadClientState()
+                    try self.pruneDeselectedLocalEntriesIfNeeded(at: rootURL)
+                    self.localSnapshot = try self.scanEntries(at: rootURL)
                     self.clientState.materializedPaths = Set(self.localSnapshot.keys)
                     self.saveClientState()
+                    self.startPathMonitor(for: rootURL)
+                    self.startHeartbeat()
+                    self.applyFinderBadges(for: self.localSnapshot.keys, status: .synced)
                     self.startClientBrowser()
                     self.updateStatus(.offline, detail: "Searching for a Starfiler sync server…")
                 }
@@ -190,6 +195,9 @@ final class NetworkSyncService: NetworkSyncControlling {
         if config.isEnabled, let rootURL {
             do {
                 localSnapshot = try scanEntries(at: rootURL)
+                if config.mode == .client {
+                    applyFinderBadges(for: localSnapshot.keys, status: .synced)
+                }
             } catch {
                 setError(error.localizedDescription)
                 return
@@ -224,6 +232,7 @@ final class NetworkSyncService: NetworkSyncControlling {
                 localSnapshot = latestSnapshot
                 clientState.materializedPaths = Set(latestSnapshot.keys)
                 saveClientState()
+                applyFinderBadges(for: localSnapshot.keys, status: .synced)
                 try pushClientChanges(changes)
             }
         } catch {
@@ -598,6 +607,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         localSnapshot = try scanEntries(at: rootURL!)
         clientState.materializedPaths = Set(localSnapshot.keys)
         saveClientState()
+        applyFinderBadges(for: localSnapshot.keys, status: .synced)
         updateStatus(.idle, detail: "Connected to \(peerRuntimes.values.first?.name ?? "server").")
     }
 
@@ -631,6 +641,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         localSnapshot = try scanEntries(at: rootURL)
         clientState.materializedPaths = Set(localSnapshot.keys)
         saveClientState()
+        applyFinderBadges(for: [relativePath], status: .synced)
         appendTransfer(relativePath: relativePath, direction: .download, status: "Completed", progress: 1, detail: "Downloaded from server")
     }
 
@@ -667,6 +678,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         localSnapshot = try scanEntries(at: rootURL)
         clientState.materializedPaths = Set(localSnapshot.keys)
         saveClientState()
+        clearFinderBadge(for: payload.relativePath)
         appendTransfer(relativePath: payload.relativePath, direction: .download, status: "Deleted", progress: nil, detail: "Applied server deletion")
     }
 
@@ -706,7 +718,7 @@ final class NetworkSyncService: NetworkSyncControlling {
             serverState.entries[conflictPath] = entry
             try saveServerState()
             localSnapshot = try scanEntries(at: rootURL)
-            appendConflict(relativePath: incoming.start.relativePath, detail: "Stored conflicting upload as \(conflictPath)")
+        appendConflict(relativePath: incoming.start.relativePath, detail: "Stored conflicting upload as \(conflictPath)")
             try sendEnvelope(.make(.conflict, payload: NetworkSyncConflictPayload(relativePath: incoming.start.relativePath, conflictPath: conflictPath, detail: "Stored as a conflict copy on the server."), encoder: encoder), over: context.connection)
             try broadcast(entry: entry, excluding: incoming.start.originDeviceID)
             return
@@ -816,6 +828,43 @@ final class NetworkSyncService: NetworkSyncControlling {
                 try sendEnvelope(.make(.delete, payload: payload, encoder: encoder), over: connection)
             }
         }
+    }
+
+    private func pruneDeselectedLocalEntriesIfNeeded(at rootURL: URL) throws {
+        guard config.mode == .client, !config.includedPaths.isEmpty else {
+            return
+        }
+
+        let allLocalPaths = try scanAllLocalRelativePaths(at: rootURL)
+        let pathsToRemove = allLocalPaths
+            .filter { !shouldSyncPath($0, includedPaths: config.includedPaths) }
+            .sorted { lhs, rhs in
+                let lhsDepth = lhs.split(separator: "/").count
+                let rhsDepth = rhs.split(separator: "/").count
+                if lhsDepth != rhsDepth {
+                    return lhsDepth > rhsDepth
+                }
+                return lhs > rhs
+            }
+
+        guard !pathsToRemove.isEmpty else {
+            return
+        }
+
+        isApplyingRemoteChange = true
+        defer { isApplyingRemoteChange = false }
+
+        for relativePath in pathsToRemove {
+            let targetURL = rootURL.appendingPathComponent(relativePath)
+            guard fileManager.fileExists(atPath: targetURL.path) else {
+                continue
+            }
+            try fileManager.removeItem(at: targetURL)
+            clearFinderBadge(for: relativePath)
+        }
+
+        clientState.materializedPaths.subtract(pathsToRemove)
+        saveClientState()
     }
 
     private func sendFile(entry: NetworkSyncFileEntry, baseRevision: Int, over connection: NWConnection) throws {
@@ -963,6 +1012,32 @@ final class NetworkSyncService: NetworkSyncControlling {
                 revision: 0,
                 deleted: false
             )
+        }
+
+        return results
+    }
+
+    private func scanAllLocalRelativePaths(at rootURL: URL) throws -> [String] {
+        guard let enumerator = fileManager.enumerator(
+            at: rootURL,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+
+        var results: [String] = []
+        for case let fileURL as URL in enumerator {
+            if fileURL.path.contains("/.starfiler-sync/") || fileURL.lastPathComponent == ".starfiler-sync" {
+                enumerator.skipDescendants()
+                continue
+            }
+
+            let relativePath = relativePath(from: rootURL, to: fileURL)
+            guard !relativePath.isEmpty else {
+                continue
+            }
+            results.append(relativePath)
         }
 
         return results
@@ -1215,6 +1290,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         conflicts = Array(conflicts.prefix(10))
         snapshot.conflicts = conflicts
         snapshot.status = .syncing
+        applyFinderBadges(for: [relativePath], status: .attention)
         publishSnapshot()
     }
 
@@ -1233,7 +1309,115 @@ final class NetworkSyncService: NetworkSyncControlling {
         )
         transfers = Array(transfers.prefix(20))
         snapshot.transfers = transfers
+        let badgeStatus: FinderBadgeStatus
+        switch status {
+        case "Completed":
+            badgeStatus = .synced
+        default:
+            badgeStatus = .syncing
+        }
+        applyFinderBadges(for: [relativePath], status: badgeStatus)
         publishSnapshot()
+    }
+
+    private enum FinderBadgeStatus {
+        case synced
+        case syncing
+        case attention
+    }
+
+    private func applyFinderBadges(for relativePaths: some Sequence<String>, status: FinderBadgeStatus) {
+        guard config.mode == .client, let rootURL else {
+            return
+        }
+
+        for relativePath in relativePaths {
+            let normalizedPath = normalizeRelativePath(relativePath)
+            guard !normalizedPath.isEmpty else {
+                continue
+            }
+            let fileURL = rootURL.appendingPathComponent(normalizedPath)
+            guard fileManager.fileExists(atPath: fileURL.path) else {
+                continue
+            }
+            applyFinderBadge(to: fileURL, status: status)
+        }
+    }
+
+    private func clearFinderBadge(for relativePath: String) {
+        guard config.mode == .client, let rootURL else {
+            return
+        }
+
+        let normalizedPath = normalizeRelativePath(relativePath)
+        guard !normalizedPath.isEmpty else {
+            return
+        }
+
+        let fileURL = rootURL.appendingPathComponent(normalizedPath)
+        guard fileManager.fileExists(atPath: fileURL.path) else {
+            return
+        }
+
+        NSWorkspace.shared.setIcon(nil, forFile: fileURL.path, options: [])
+    }
+
+    private func applyFinderBadge(to fileURL: URL, status: FinderBadgeStatus) {
+        NSWorkspace.shared.setIcon(nil, forFile: fileURL.path, options: [])
+        let baseIcon = NSWorkspace.shared.icon(forFile: fileURL.path)
+        baseIcon.isTemplate = false
+
+        let symbolName: String
+        let tint: NSColor
+        switch status {
+        case .synced:
+            symbolName = "checkmark.circle.fill"
+            tint = .systemGreen
+        case .syncing:
+            symbolName = "arrow.triangle.2.circlepath.circle.fill"
+            tint = .systemBlue
+        case .attention:
+            symbolName = "exclamationmark.triangle.fill"
+            tint = .systemOrange
+        }
+
+        guard let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil) else {
+            return
+        }
+
+        let iconSize = max(max(baseIcon.size.width, baseIcon.size.height), 32)
+        let canvasSize = NSSize(width: iconSize, height: iconSize)
+        let badgedIcon = NSImage(size: canvasSize)
+        badgedIcon.lockFocus()
+        baseIcon.size = canvasSize
+        baseIcon.draw(in: NSRect(origin: .zero, size: canvasSize))
+
+        let badgeSide = max(14, canvasSize.width * 0.42)
+        let badgeRect = NSRect(
+            x: canvasSize.width - badgeSide,
+            y: 0,
+            width: badgeSide,
+            height: badgeSide
+        )
+        let circlePath = NSBezierPath(ovalIn: badgeRect)
+        NSColor.windowBackgroundColor.withAlphaComponent(0.92).setFill()
+        circlePath.fill()
+
+        let configuredSymbol = symbol.withSymbolConfiguration(
+            NSImage.SymbolConfiguration(pointSize: badgeSide * 0.72, weight: .bold)
+        ) ?? symbol
+        let tinted = configuredSymbol.copy() as? NSImage ?? configuredSymbol
+        tinted.isTemplate = true
+        tinted.size = NSSize(width: badgeSide * 0.78, height: badgeSide * 0.78)
+        tint.set()
+        let symbolOrigin = NSPoint(
+            x: badgeRect.midX - (tinted.size.width / 2),
+            y: badgeRect.midY - (tinted.size.height / 2)
+        )
+        tinted.draw(in: NSRect(origin: symbolOrigin, size: tinted.size), from: .zero, operation: .sourceOver, fraction: 1)
+        badgedIcon.unlockFocus()
+
+        NSWorkspace.shared.setIcon(badgedIcon, forFile: fileURL.path, options: [])
     }
 
     private func updateStatus(_ status: NetworkSyncRuntimeStatus, detail: String) {

@@ -70,7 +70,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         self.isEnabled = loadedConfig.isEnabled
         self.mode = loadedConfig.mode
         self.displayName = loadedConfig.displayName
-        self.rootPath = loadedConfig.rootPath
+        self.rootPath = loadedConfig.effectiveRootPath
         self.includedPathsText = loadedConfig.includedPaths.joined(separator: "\n")
         self.conflictPolicy = loadedConfig.conflictPolicy
         self.heartbeatIntervalSeconds = loadedConfig.heartbeatIntervalSeconds
@@ -98,7 +98,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         isEnabled = config.isEnabled
         mode = config.mode
         displayName = config.displayName
-        rootPath = config.rootPath
+        rootPath = config.effectiveRootPath
         includedPathsText = config.includedPaths.joined(separator: "\n")
         conflictPolicy = config.conflictPolicy
         heartbeatIntervalSeconds = config.heartbeatIntervalSeconds
@@ -117,7 +117,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
 
     func save() {
         let sanitizedDisplayName = sanitized(displayName, fallback: Host.current().localizedName ?? ProcessInfo.processInfo.hostName)
-        let sanitizedRootPath = sanitized(rootPath)
+        let sanitizedRootPath = sanitized(rootPath, fallback: mode == .client ? NetworkSyncConfig.defaultClientRootPath : "")
         let sanitizedIncludedPaths = currentIncludedPaths()
 
         let nextConfig = NetworkSyncConfig(
@@ -136,7 +136,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
             try configManager.saveNetworkSyncConfig(nextConfig)
             config = nextConfig
             displayName = nextConfig.displayName
-            rootPath = nextConfig.rootPath
+            rootPath = nextConfig.effectiveRootPath
             syncEntireRoot = nextConfig.includedPaths.isEmpty
             includedPathsText = nextConfig.includedPaths.joined(separator: "\n")
             refreshPeerSummaries()
@@ -170,6 +170,15 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         service.stop()
     }
 
+    func setMode(_ nextMode: SyncNodeMode) {
+        mode = nextMode
+        applyModeDefaultsIfNeeded()
+        statusMessage = nextMode == .server
+            ? "Server mode publishes a shared root."
+            : "Client mode mirrors selected folders into \(rootPath)."
+        notifyDidChange()
+    }
+
     func setSyncEntireRoot(_ enabled: Bool) {
         syncEntireRoot = enabled
         if enabled {
@@ -181,6 +190,13 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         refreshSelectiveSyncBrowser()
         statusMessage = enabled ? "Syncs the whole root. Save to apply." : "Using explicit selective sync paths. Save to apply."
         notifyDidChange()
+    }
+
+    func applyModeDefaultsIfNeeded() {
+        if mode == .client && sanitized(rootPath).isEmpty {
+            rootPath = NetworkSyncConfig.defaultClientRootPath
+        }
+        refreshSelectiveSyncPreview()
     }
 
     func toggleSelectiveNode(path: String, isSelected: Bool) {
@@ -293,7 +309,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         } else if syncEntireRoot {
             selectiveSyncHint = "Everything under the server root is selected. Turn this off to choose folders individually."
         } else {
-            selectiveSyncHint = "Selections are inclusive. Removing a folder keeps any existing local copy unless you delete it yourself."
+            selectiveSyncHint = "Selections are inclusive. Unchecked paths are removed from this Mac after Save."
         }
 
         if syncEntireRoot {
@@ -332,11 +348,12 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
             }
             return state.knownEntries.values.filter { !$0.deleted }
         case .server:
-            let trimmedRootPath = normalizeRelativePath(rootPath)
+            let effectiveRootPath = mode == .client ? config.effectiveRootPath : rootPath
+            let trimmedRootPath = normalizeRelativePath(effectiveRootPath)
             guard !trimmedRootPath.isEmpty else {
                 return []
             }
-            let rootURL = URL(fileURLWithPath: UserPaths.expandHomeVariables(in: rootPath), isDirectory: true).standardizedFileURL
+            let rootURL = URL(fileURLWithPath: UserPaths.expandHomeVariables(in: effectiveRootPath), isDirectory: true).standardizedFileURL
             let stateURL = rootURL.appendingPathComponent(".starfiler-sync/state.json")
             guard let data = try? Data(contentsOf: stateURL),
                   let state = try? JSONDecoder().decode(NetworkSyncServerState.self, from: data)
@@ -348,7 +365,8 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
     }
 
     private func loadLocalAvailability() -> Set<String> {
-        let trimmedRootPath = rootPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let effectiveRootPath = mode == .client ? sanitized(rootPath, fallback: NetworkSyncConfig.defaultClientRootPath) : rootPath
+        let trimmedRootPath = effectiveRootPath.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedRootPath.isEmpty else {
             return []
         }
@@ -519,7 +537,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
             return "Some children selected"
         case .off:
             if node.isLocalAvailable {
-                return "Local copy kept"
+                return "Will be removed on Save"
             }
             if node.isDirectory, !children.isEmpty {
                 return "Server subtree only"

@@ -14,6 +14,17 @@ enum SyncNodeMode: String, Codable, CaseIterable, Sendable {
     }
 }
 
+extension SyncNodeMode {
+    var rootPathDescription: String {
+        switch self {
+        case .server:
+            return "Authoritative sync root on the server Mac, typically on the external drive."
+        case .client:
+            return "Local sync folder on this Mac. Checked items are downloaded here."
+        }
+    }
+}
+
 enum NetworkSyncConflictPolicy: String, Codable, CaseIterable, Sendable {
     case keepBoth
     case serverWins
@@ -147,6 +158,21 @@ struct NetworkSyncConfig: Codable, Sendable {
     var syncDebounceSeconds: Double
     var peers: [NetworkSyncPeerConfig]
 
+    static var defaultClientRootPath: String {
+        UserPaths.homeDirectoryPath + "/StarFilerSync"
+    }
+
+    var effectiveRootPath: String {
+        let trimmed = rootPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            return trimmed
+        }
+        if mode == .client {
+            return Self.defaultClientRootPath
+        }
+        return ""
+    }
+
     init(
         isEnabled: Bool = false,
         mode: SyncNodeMode = .server,
@@ -161,7 +187,8 @@ struct NetworkSyncConfig: Codable, Sendable {
         self.isEnabled = isEnabled
         self.mode = mode
         self.displayName = displayName
-        self.rootPath = rootPath
+        let trimmedRootPath = rootPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.rootPath = trimmedRootPath.isEmpty && mode == .client ? Self.defaultClientRootPath : rootPath
         self.includedPaths = includedPaths
         self.conflictPolicy = conflictPolicy
         self.heartbeatIntervalSeconds = max(5, heartbeatIntervalSeconds)

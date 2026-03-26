@@ -6,7 +6,7 @@ final class NetworkSyncSettingsViewController: NSViewController {
 
     private let titleLabel = NSTextField(labelWithString: "Network Sync")
     private let descriptionLabel = NSTextField(
-        wrappingLabelWithString: "Run one Mac as the server on the external drive. Clients can browse the latest server snapshot, choose what stays on this Mac, and keep any local copy when a path is unchecked."
+        wrappingLabelWithString: "Run one Mac as the server on the external drive. Clients browse that server tree and download checked items into a local sync folder."
     )
     private let enabledCheckBox = NSButton(checkboxWithTitle: "Enable network sync", target: nil, action: nil)
     private let modeControl = NSSegmentedControl(
@@ -17,6 +17,7 @@ final class NetworkSyncSettingsViewController: NSViewController {
     )
     private let displayNameField = NSTextField()
     private let rootPathField = NSTextField()
+    private let rootPathHelpLabel = NSTextField(wrappingLabelWithString: "")
     private let chooseRootButton = NSButton(title: "Choose…", target: nil, action: nil)
     private let syncEntireRootCheckBox = NSButton(checkboxWithTitle: "Sync Entire Root", target: nil, action: nil)
     private let refreshTreeButton = NSButton(title: "Refresh Tree", target: nil, action: nil)
@@ -77,6 +78,11 @@ final class NetworkSyncSettingsViewController: NSViewController {
 
         rootPathField.translatesAutoresizingMaskIntoConstraints = false
         rootPathField.placeholderString = "/Volumes/HD-AD6U3/Shared"
+
+        rootPathHelpLabel.translatesAutoresizingMaskIntoConstraints = false
+        rootPathHelpLabel.font = .systemFont(ofSize: 11)
+        rootPathHelpLabel.textColor = .secondaryLabelColor
+        rootPathHelpLabel.maximumNumberOfLines = 3
 
         chooseRootButton.translatesAutoresizingMaskIntoConstraints = false
         chooseRootButton.bezelStyle = .rounded
@@ -214,9 +220,10 @@ final class NetworkSyncSettingsViewController: NSViewController {
             labeledRow(title: "Mode", field: modeControl),
             labeledRow(title: "Display Name", field: displayNameField),
             labeledRow(title: "Root Path", field: rootPathStack),
+            rootPathHelpLabel,
             labeledSection(
                 title: "Selective Sync",
-                detail: "Turn off whole-root sync to choose folders or files from the latest server snapshot. Unchecked paths stay on the server, and any existing local copy is kept for safety.",
+                detail: "Turn off whole-root sync to choose folders or files from the latest server snapshot. Unchecked paths stay on the server and are removed from this Mac after Save.",
                 body: selectiveSyncBody
             ),
             labeledRow(title: "Conflict Policy", field: conflictPolicyPopup),
@@ -249,10 +256,18 @@ final class NetworkSyncSettingsViewController: NSViewController {
     }
 
     private func refreshFromViewModel() {
+        descriptionLabel.stringValue = viewModel.mode == .server
+            ? "Server mode turns this Mac into the authoritative sync host. Other Macs discover it on the LAN and mirror from this root."
+            : "Client mode mirrors checked folders from the server onto this Mac. The local sync destination defaults to ~/StarFilerSync."
         enabledCheckBox.state = viewModel.isEnabled ? .on : .off
         modeControl.selectedSegment = SyncNodeMode.allCases.firstIndex(of: viewModel.mode) ?? 0
         displayNameField.stringValue = viewModel.displayName
         rootPathField.stringValue = viewModel.rootPath
+        rootPathField.placeholderString = viewModel.mode == .server
+            ? "/Volumes/HD-AD6U3/Shared"
+            : NetworkSyncConfig.defaultClientRootPath
+        chooseRootButton.title = viewModel.mode == .server ? "Choose Server Root…" : "Choose Local Sync Folder…"
+        rootPathHelpLabel.stringValue = rootPathHelpText()
         syncEntireRootCheckBox.state = viewModel.syncEntireRoot ? .on : .off
         selectiveSyncSummaryLabel.stringValue = "Selection: \(viewModel.selectiveSyncSummary)"
         selectiveSyncHintLabel.stringValue = viewModel.selectiveSyncHint
@@ -295,8 +310,7 @@ final class NetworkSyncSettingsViewController: NSViewController {
     @objc
     private func changeMode(_ sender: NSSegmentedControl) {
         let selectedIndex = max(sender.selectedSegment, 0)
-        viewModel.mode = SyncNodeMode.allCases[selectedIndex]
-        viewModel.refreshSelectiveSyncPreview()
+        viewModel.setMode(SyncNodeMode.allCases[selectedIndex])
     }
 
     @objc
@@ -385,6 +399,15 @@ final class NetworkSyncSettingsViewController: NSViewController {
                     .joined(separator: "\n")
             }
             .joined(separator: "\n\n")
+    }
+
+    private func rootPathHelpText() -> String {
+        switch viewModel.mode {
+        case .server:
+            return "Server mode: this folder is the authoritative shared root. Put it on HD-AD6U3 or another always-mounted volume."
+        case .client:
+            return "Client mode: checked folders and files are downloaded into this local folder. Default is \(NetworkSyncConfig.defaultClientRootPath)."
+        }
     }
 
     private func labeledRow(title: String, field: NSView) -> NSView {

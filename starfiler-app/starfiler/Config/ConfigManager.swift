@@ -129,15 +129,24 @@ final class ConfigManager {
     }
 
     func loadNetworkSyncConfig() -> NetworkSyncConfig {
-        load(NetworkSyncConfig.self, from: networkSyncConfigURL) ?? NetworkSyncConfig()
+        let loadedConfig = load(NetworkSyncConfig.self, from: networkSyncConfigURL) ?? NetworkSyncConfig()
+        return normalizedNetworkSyncConfig(loadedConfig)
     }
 
     func saveNetworkSyncConfig(_ config: NetworkSyncConfig) throws {
-        try save(config, to: networkSyncConfigURL)
+        try save(normalizedNetworkSyncConfig(config), to: networkSyncConfigURL)
     }
 
     var networkSyncConfigURL: URL {
         configDirectory.appendingPathComponent(FileName.networkSyncConfig, isDirectory: false)
+    }
+
+    private func normalizedNetworkSyncConfig(_ config: NetworkSyncConfig) -> NetworkSyncConfig {
+        var normalized = config
+        if normalized.mode == .client {
+            normalized.rootPath = normalized.effectiveRootPath
+        }
+        return normalized
     }
 
     func loadVisitHistoryConfig() -> VisitHistoryConfig {
