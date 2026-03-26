@@ -61,6 +61,7 @@ final class NetworkSyncService: NetworkSyncControlling {
     private var peerRuntimes: [String: NetworkSyncPeerRuntime] = [:]
     private var conflicts: [NetworkSyncConflictRecord] = []
     private var transfers: [NetworkSyncTransferRecord] = []
+    private var activeTransfersByPath: [String: NetworkSyncTransferActivity] = [:]
     private var isApplyingRemoteChange = false
 
     init(
@@ -174,7 +175,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         rootURL = nil
         localSnapshot = [:]
         snapshot = config.isEnabled
-            ? NetworkSyncRuntimeSnapshot(status: .offline, detail: "Network sync stopped.", peers: [], conflicts: conflicts, transfers: transfers)
+            ? NetworkSyncRuntimeSnapshot(status: .offline, detail: "Network sync stopped.", peers: [], conflicts: conflicts, transfers: transfers, activeTransfers: [:])
             : .disabled
         publishSnapshot()
     }
@@ -244,7 +245,7 @@ final class NetworkSyncService: NetworkSyncControlling {
 
     private func sendHeartbeat() {
         for context in connections.values {
-            try? sendEnvelope(.make(.heartbeat, payload: NetworkSyncStateRequestPayload(includedPaths: []), encoder: encoder), over: context.connection)
+            try? sendEnvelope(.make(.heartbeat, payload: NetworkSyncStateRequestPayload(syncEntireRoot: true, includedPaths: []), encoder: encoder), over: context.connection)
         }
     }
 
@@ -409,11 +410,12 @@ final class NetworkSyncService: NetworkSyncControlling {
             displayName: config.displayName,
             mode: config.mode,
             protocolVersion: 1,
+            syncEntireRoot: config.syncEntireRoot,
             includedPaths: config.includedPaths
         )
         do {
             try sendEnvelope(.make(.hello, payload: hello, encoder: encoder), over: connection)
-            try sendEnvelope(.make(.stateRequest, payload: NetworkSyncStateRequestPayload(includedPaths: config.includedPaths), encoder: encoder), over: connection)
+            try sendEnvelope(.make(.stateRequest, payload: NetworkSyncStateRequestPayload(syncEntireRoot: config.syncEntireRoot, includedPaths: config.includedPaths), encoder: encoder), over: connection)
         } catch {
             setError(error.localizedDescription)
         }
@@ -504,12 +506,14 @@ final class NetworkSyncService: NetworkSyncControlling {
         case .fileTransferStart:
             let payload = try envelope.decode(NetworkSyncFileTransferStartPayload.self, decoder: decoder)
             context.incomingTransfers[payload.transferID] = IncomingTransfer(start: payload, data: Data())
+            markTransferActive(relativePath: payload.relativePath, activity: config.mode == .server ? .upload : .download)
         case .fileTransferChunk:
             let payload = try envelope.decode(NetworkSyncFileTransferChunkPayload.self, decoder: decoder)
             context.incomingTransfers[payload.transferID]?.data.append(payload.data)
         case .fileTransferEnd:
             let payload = try envelope.decode(NetworkSyncFileTransferEndPayload.self, decoder: decoder)
             guard let incoming = context.incomingTransfers.removeValue(forKey: payload.transferID) else { return }
+            defer { finishTransferActivity(relativePath: incoming.start.relativePath) }
             if config.mode == .server {
                 try applyIncomingClientTransfer(incoming, hash: payload.contentHash, from: context)
             } else {
@@ -552,7 +556,7 @@ final class NetworkSyncService: NetworkSyncControlling {
                 relativePath = path
             }
 
-            guard shouldSyncPath(relativePath, includedPaths: config.includedPaths) else {
+            guard shouldSyncPath(relativePath, syncEntireRoot: config.syncEntireRoot, includedPaths: config.includedPaths) else {
                 continue
             }
 
@@ -571,7 +575,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         }
 
         for entry in remoteEntries.values.sorted(by: { $0.relativePath < $1.relativePath }) {
-            guard shouldSyncPath(entry.relativePath, includedPaths: config.includedPaths) else {
+            guard shouldSyncPath(entry.relativePath, syncEntireRoot: config.syncEntireRoot, includedPaths: config.includedPaths) else {
                 clientState.knownEntries[entry.relativePath] = entry
                 clientState.materializedPaths.remove(entry.relativePath)
                 continue
@@ -825,7 +829,7 @@ final class NetworkSyncService: NetworkSyncControlling {
                 relativePath = path
             }
 
-            guard shouldSyncPath(relativePath, includedPaths: config.includedPaths) else {
+            guard shouldSyncPath(relativePath, syncEntireRoot: config.syncEntireRoot, includedPaths: config.includedPaths) else {
                 continue
             }
 
@@ -845,13 +849,13 @@ final class NetworkSyncService: NetworkSyncControlling {
     }
 
     private func pruneDeselectedLocalEntriesIfNeeded(at rootURL: URL) throws {
-        guard config.mode == .client, !config.includedPaths.isEmpty else {
+        guard config.mode == .client, !config.syncEntireRoot else {
             return
         }
 
         let allLocalPaths = try scanAllLocalRelativePaths(at: rootURL)
         let pathsToRemove = allLocalPaths
-            .filter { !shouldSyncPath($0, includedPaths: config.includedPaths) }
+            .filter { !shouldSyncPath($0, syncEntireRoot: config.syncEntireRoot, includedPaths: config.includedPaths) }
             .sorted { lhs, rhs in
                 let lhsDepth = lhs.split(separator: "/").count
                 let rhsDepth = rhs.split(separator: "/").count
@@ -893,6 +897,9 @@ final class NetworkSyncService: NetworkSyncControlling {
             originDeviceID: deviceID
         )
 
+        markTransferActive(relativePath: entry.relativePath, activity: .upload)
+        defer { finishTransferActivity(relativePath: entry.relativePath) }
+
         try sendEnvelope(.make(.fileTransferStart, payload: start, encoder: encoder), over: connection)
 
         if !entry.isDirectory, let rootURL {
@@ -911,14 +918,14 @@ final class NetworkSyncService: NetworkSyncControlling {
         }
 
         try sendEnvelope(.make(.fileTransferEnd, payload: NetworkSyncFileTransferEndPayload(transferID: start.transferID, contentHash: entry.contentHash), encoder: encoder), over: connection)
-        appendTransfer(relativePath: entry.relativePath, direction: config.mode == .server ? .download : .upload, status: "Sent", progress: 1, detail: "Queued over network")
+        appendTransfer(relativePath: entry.relativePath, direction: .upload, status: "Sent", progress: 1, detail: "Queued over network")
     }
 
     private func broadcast(entry: NetworkSyncFileEntry, excluding originDeviceID: UUID?) throws {
         for context in connections.values {
             guard let hello = context.hello, hello.mode == .client else { continue }
             guard hello.deviceID != originDeviceID else { continue }
-            guard shouldSyncPath(entry.relativePath, includedPaths: hello.includedPaths) else { continue }
+            guard shouldSyncPath(entry.relativePath, syncEntireRoot: hello.syncEntireRoot, includedPaths: hello.includedPaths) else { continue }
             try sendFile(entry: entry, baseRevision: entry.revision, over: context.connection)
         }
     }
@@ -927,7 +934,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         for context in connections.values {
             guard let hello = context.hello, hello.mode == .client else { continue }
             guard hello.deviceID != originDeviceID else { continue }
-            guard shouldSyncPath(entry.relativePath, includedPaths: hello.includedPaths) else { continue }
+            guard shouldSyncPath(entry.relativePath, syncEntireRoot: hello.syncEntireRoot, includedPaths: hello.includedPaths) else { continue }
             let payload = NetworkSyncDeletePayload(
                 relativePath: entry.relativePath,
                 baseRevision: max(entry.revision - 1, 0),
@@ -1003,7 +1010,7 @@ final class NetworkSyncService: NetworkSyncControlling {
             }
 
             let relativePath = relativePath(from: rootURL, to: fileURL)
-            guard shouldSyncPath(relativePath, includedPaths: config.includedPaths),
+            guard shouldSyncPath(relativePath, syncEntireRoot: config.syncEntireRoot, includedPaths: config.includedPaths),
                   !matchesExcludeRules(relativePath: relativePath)
             else {
                 if isDirectoryURL(fileURL) {
@@ -1257,12 +1264,12 @@ final class NetworkSyncService: NetworkSyncControlling {
         return revision
     }
 
-    private func shouldSyncPath(_ relativePath: String, includedPaths: [String]) -> Bool {
+    private func shouldSyncPath(_ relativePath: String, syncEntireRoot: Bool, includedPaths: [String]) -> Bool {
         let normalizedPath = normalizeRelativePath(relativePath)
         guard !normalizedPath.isEmpty else {
             return false
         }
-        guard !includedPaths.isEmpty else {
+        guard !syncEntireRoot else {
             return true
         }
         return includedPaths.map(normalizeRelativePath).contains { include in
@@ -1336,6 +1343,22 @@ final class NetworkSyncService: NetworkSyncControlling {
             badgeStatus = .syncing
         }
         applyFinderBadges(for: [relativePath], status: badgeStatus)
+        publishSnapshot()
+    }
+
+    private func markTransferActive(relativePath: String, activity: NetworkSyncTransferActivity) {
+        activeTransfersByPath[relativePath] = activity
+        if snapshot.status == .idle || snapshot.status == .starting {
+            snapshot.status = .syncing
+        }
+        publishSnapshot()
+    }
+
+    private func finishTransferActivity(relativePath: String) {
+        activeTransfersByPath.removeValue(forKey: relativePath)
+        if activeTransfersByPath.isEmpty, snapshot.status == .syncing {
+            snapshot.status = .idle
+        }
         publishSnapshot()
     }
 
@@ -1455,6 +1478,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         snapshot.peers = Array(peerRuntimes.values).sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         snapshot.conflicts = conflicts
         snapshot.transfers = transfers
+        snapshot.activeTransfers = activeTransfersByPath
         onSnapshot?(snapshot)
     }
 

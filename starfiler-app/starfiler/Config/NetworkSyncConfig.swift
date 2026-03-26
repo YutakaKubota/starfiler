@@ -153,6 +153,7 @@ struct NetworkSyncConfig: Codable, Sendable {
     var displayName: String
     var discoveryScope: String
     var rootPath: String
+    var syncEntireRoot: Bool
     var includedPaths: [String]
     var conflictPolicy: NetworkSyncConflictPolicy
     var heartbeatIntervalSeconds: Double
@@ -189,6 +190,7 @@ struct NetworkSyncConfig: Codable, Sendable {
         displayName: String = Host.current().localizedName ?? ProcessInfo.processInfo.hostName,
         discoveryScope: String = "default",
         rootPath: String = "",
+        syncEntireRoot: Bool = true,
         includedPaths: [String] = [],
         conflictPolicy: NetworkSyncConflictPolicy = .keepBoth,
         heartbeatIntervalSeconds: Double = 30,
@@ -201,10 +203,43 @@ struct NetworkSyncConfig: Codable, Sendable {
         self.discoveryScope = discoveryScope
         let trimmedRootPath = rootPath.trimmingCharacters(in: .whitespacesAndNewlines)
         self.rootPath = trimmedRootPath.isEmpty && mode == .client ? Self.defaultClientRootPath : rootPath
+        self.syncEntireRoot = syncEntireRoot
         self.includedPaths = includedPaths
         self.conflictPolicy = conflictPolicy
         self.heartbeatIntervalSeconds = max(5, heartbeatIntervalSeconds)
         self.syncDebounceSeconds = max(0.2, syncDebounceSeconds)
         self.peers = peers
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case isEnabled
+        case mode
+        case displayName
+        case discoveryScope
+        case rootPath
+        case syncEntireRoot
+        case includedPaths
+        case conflictPolicy
+        case heartbeatIntervalSeconds
+        case syncDebounceSeconds
+        case peers
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let includedPaths = try container.decodeIfPresent([String].self, forKey: .includedPaths) ?? []
+        self.init(
+            isEnabled: try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? false,
+            mode: try container.decodeIfPresent(SyncNodeMode.self, forKey: .mode) ?? .server,
+            displayName: try container.decodeIfPresent(String.self, forKey: .displayName) ?? (Host.current().localizedName ?? ProcessInfo.processInfo.hostName),
+            discoveryScope: try container.decodeIfPresent(String.self, forKey: .discoveryScope) ?? "default",
+            rootPath: try container.decodeIfPresent(String.self, forKey: .rootPath) ?? "",
+            syncEntireRoot: try container.decodeIfPresent(Bool.self, forKey: .syncEntireRoot) ?? includedPaths.isEmpty,
+            includedPaths: includedPaths,
+            conflictPolicy: try container.decodeIfPresent(NetworkSyncConflictPolicy.self, forKey: .conflictPolicy) ?? .keepBoth,
+            heartbeatIntervalSeconds: try container.decodeIfPresent(Double.self, forKey: .heartbeatIntervalSeconds) ?? 30,
+            syncDebounceSeconds: try container.decodeIfPresent(Double.self, forKey: .syncDebounceSeconds) ?? 1,
+            peers: try container.decodeIfPresent([NetworkSyncPeerConfig].self, forKey: .peers) ?? []
+        )
     }
 }

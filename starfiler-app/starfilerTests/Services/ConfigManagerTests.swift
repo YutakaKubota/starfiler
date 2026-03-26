@@ -241,6 +241,55 @@ final class ConfigManagerTests: XCTestCase {
         XCTAssertEqual(loaded.presets[0].name, "My Preset")
     }
 
+    // MARK: - NetworkSyncConfig
+
+    func testLoadNetworkSyncConfigMigratesLegacyMissingFields() throws {
+        let legacyJSON = """
+        {
+          "isEnabled": true,
+          "mode": "client",
+          "displayName": "Legacy Client",
+          "rootPath": "/tmp/legacy-root",
+          "includedPaths": ["docs"],
+          "conflictPolicy": "keepBoth",
+          "heartbeatIntervalSeconds": 15,
+          "syncDebounceSeconds": 0.8,
+          "peers": []
+        }
+        """
+        try legacyJSON.data(using: .utf8)?.write(to: sut.networkSyncConfigURL)
+
+        let loaded = sut.loadNetworkSyncConfig()
+
+        XCTAssertEqual(loaded.displayName, "Legacy Client")
+        XCTAssertEqual(loaded.discoveryScope, "default")
+        XCTAssertFalse(loaded.syncEntireRoot)
+        XCTAssertEqual(loaded.includedPaths, ["docs"])
+    }
+
+    func testSaveAndLoadNetworkSyncConfigPreservesEmptyExplicitSelection() throws {
+        let config = NetworkSyncConfig(
+            isEnabled: true,
+            mode: .client,
+            displayName: "Client",
+            discoveryScope: "local-smoke",
+            rootPath: "/tmp/client-root",
+            syncEntireRoot: false,
+            includedPaths: [],
+            conflictPolicy: .keepBoth,
+            heartbeatIntervalSeconds: 10,
+            syncDebounceSeconds: 0.5,
+            peers: []
+        )
+
+        try sut.saveNetworkSyncConfig(config)
+        let loaded = sut.loadNetworkSyncConfig()
+
+        XCTAssertFalse(loaded.syncEntireRoot)
+        XCTAssertEqual(loaded.includedPaths, [])
+        XCTAssertEqual(loaded.discoveryScope, "local-smoke")
+    }
+
     // MARK: - Config Directory
 
     func testConfigDirectoryIsCreated() {

@@ -7,13 +7,26 @@ enum SelectiveSyncSelectionState: Sendable {
     case mixed
 }
 
+enum SelectiveSyncRuntimeState: Sendable {
+    case synced
+    case selectedPendingDownload
+    case syncingUpload
+    case syncingDownload
+    case pendingRemoval
+    case serverOnly
+    case partiallySelected
+    case conflict
+}
+
 struct SelectiveSyncBrowserNode: Identifiable, Hashable, Sendable {
     let id: String
     let path: String
     let name: String
     let isDirectory: Bool
     let selectionState: SelectiveSyncSelectionState
+    let runtimeState: SelectiveSyncRuntimeState
     let statusText: String
+    let sizeText: String
     let isLocalAvailable: Bool
     let isRemoteAvailable: Bool
     let children: [SelectiveSyncBrowserNode]
@@ -51,6 +64,8 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
     private let fileManager: FileManager
     private let service: any NetworkSyncControlling
     private var config: NetworkSyncConfig
+    private var activeTransfers: [String: NetworkSyncTransferActivity] = [:]
+    private let byteCountFormatter: ByteCountFormatter
     private var changeObservers: [UUID: @MainActor () -> Void] = [:]
 
     init(
@@ -64,6 +79,9 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         self.peerSummaryDateFormatter = DateFormatter()
         peerSummaryDateFormatter.dateStyle = .short
         peerSummaryDateFormatter.timeStyle = .short
+        self.byteCountFormatter = ByteCountFormatter()
+        byteCountFormatter.countStyle = .file
+        byteCountFormatter.includesUnit = true
 
         let loadedConfig = configManager.loadNetworkSyncConfig()
         self.config = loadedConfig
@@ -77,7 +95,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         self.syncDebounceSeconds = loadedConfig.syncDebounceSeconds
         self.peerSummaries = []
         self.statusMessage = loadedConfig.isEnabled ? "Sync is enabled" : "Sync is disabled"
-        self.syncEntireRoot = loadedConfig.includedPaths.isEmpty
+        self.syncEntireRoot = loadedConfig.syncEntireRoot
         self.service = service ?? NetworkSyncService(
             configManager: configManager,
             securityScopedBookmarkService: securityScopedBookmarkService
@@ -103,7 +121,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         conflictPolicy = config.conflictPolicy
         heartbeatIntervalSeconds = config.heartbeatIntervalSeconds
         syncDebounceSeconds = config.syncDebounceSeconds
-        syncEntireRoot = config.includedPaths.isEmpty
+        syncEntireRoot = config.syncEntireRoot
         refreshPeerSummaries()
         refreshSelectiveSyncBrowser()
         statusMessage = "Reloaded from disk"
@@ -124,7 +142,9 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
             isEnabled: isEnabled,
             mode: mode,
             displayName: sanitizedDisplayName,
+            discoveryScope: config.discoveryScope,
             rootPath: sanitizedRootPath,
+            syncEntireRoot: syncEntireRoot,
             includedPaths: sanitizedIncludedPaths,
             conflictPolicy: conflictPolicy,
             heartbeatIntervalSeconds: heartbeatIntervalSeconds,
@@ -137,7 +157,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
             config = nextConfig
             displayName = nextConfig.displayName
             rootPath = nextConfig.effectiveRootPath
-            syncEntireRoot = nextConfig.includedPaths.isEmpty
+            syncEntireRoot = nextConfig.syncEntireRoot
             includedPathsText = nextConfig.includedPaths.joined(separator: "\n")
             refreshPeerSummaries()
             refreshSelectiveSyncBrowser()
@@ -181,14 +201,12 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
 
     func setSyncEntireRoot(_ enabled: Bool) {
         syncEntireRoot = enabled
-        if enabled {
-            config.includedPaths = []
-        } else if config.includedPaths.isEmpty {
-            config.includedPaths = selectiveSyncNodes.map(\.path)
-        }
+        config.syncEntireRoot = enabled
         syncIncludedPathsText()
         refreshSelectiveSyncBrowser()
-        statusMessage = enabled ? "Syncs the whole root. Save to apply." : "Using explicit selective sync paths. Save to apply."
+        statusMessage = enabled
+            ? "Whole-root sync is enabled. Previous explicit selection is preserved."
+            : "Using explicit selective sync paths. Save to apply."
         notifyDidChange()
     }
 
@@ -220,10 +238,30 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         }
 
         config.includedPaths = selectedPaths.sorted()
-        syncEntireRoot = config.includedPaths.isEmpty
+        config.syncEntireRoot = syncEntireRoot
         syncIncludedPathsText()
         refreshSelectiveSyncBrowser()
         statusMessage = "Selective sync updated. Save to apply."
+        notifyDidChange()
+    }
+
+    func selectAllSelectiveSyncItems() {
+        syncEntireRoot = false
+        config.syncEntireRoot = false
+        config.includedPaths = selectiveSyncNodes.map(\.path)
+        syncIncludedPathsText()
+        refreshSelectiveSyncBrowser()
+        statusMessage = "Selected all visible folders and files. Save to apply."
+        notifyDidChange()
+    }
+
+    func clearAllSelectiveSyncItems() {
+        syncEntireRoot = false
+        config.syncEntireRoot = false
+        config.includedPaths = []
+        syncIncludedPathsText()
+        refreshSelectiveSyncBrowser()
+        statusMessage = "Cleared all explicit selections. Save to apply."
         notifyDidChange()
     }
 
@@ -258,6 +296,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         statusTitle = snapshot.status == .disabled ? "Network Sync Disabled" : "Network Sync"
         statusDetail = snapshot.detail
         statusMessage = snapshot.detail
+        activeTransfers = snapshot.activeTransfers
         peers = snapshot.peers.map { peer in
             SyncPeerSummary(
                 id: peer.id,
@@ -300,33 +339,30 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         let entries = loadAvailableEntries()
         let localAvailability = loadLocalAvailability()
         let roots = buildTree(entries: entries, localAvailability: localAvailability)
-        selectiveSyncNodes = roots.map { materializeNode($0) }
+        selectiveSyncNodes = roots.map { materializeNode($0).node }
 
         if mode == .server {
             selectiveSyncHint = "Server mode shows the exported root inventory. Clients choose their own sync selection."
         } else if selectiveSyncNodes.isEmpty {
             selectiveSyncHint = "Connect once as a client to fetch the server tree, then pick folders or files to keep on this Mac."
         } else if syncEntireRoot {
-            selectiveSyncHint = "Everything under the server root is selected. Turn this off to choose folders individually."
+            selectiveSyncHint = "Everything under the server root is selected. Turn this off to restore explicit folder picks without losing them."
         } else {
-            selectiveSyncHint = "Selections are inclusive. Unchecked paths are removed from this Mac after Save."
+            selectiveSyncHint = "Folder checkboxes apply recursively. Unchecked paths are removed from this Mac after Save."
         }
 
         if syncEntireRoot {
             selectiveSyncSummary = selectiveSyncNodes.isEmpty
                 ? "Syncs the whole root when a server snapshot becomes available."
                 : "Syncs the whole root."
-        } else if config.includedPaths.isEmpty {
-            selectiveSyncSummary = "No explicit paths selected."
+        } else if currentIncludedPaths().isEmpty {
+            selectiveSyncSummary = "Nothing selected. This Mac keeps no local synced copy until you pick folders."
         } else {
-            selectiveSyncSummary = config.includedPaths.joined(separator: ", ")
+            selectiveSyncSummary = currentIncludedPaths().joined(separator: ", ")
         }
     }
 
     private func currentIncludedPaths() -> [String] {
-        if syncEntireRoot {
-            return []
-        }
         return config.includedPaths
             .map(normalizeRelativePath)
             .filter { !$0.isEmpty }
@@ -421,6 +457,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
                 path: currentPath,
                 name: component,
                 isDirectory: isDirectory,
+                directBytes: isLeaf ? entry.size : 0,
                 isRemoteAvailable: isLeaf,
                 isLocalAvailable: localAvailability.contains(currentPath),
                 children: [:]
@@ -430,6 +467,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
                 path: node.path,
                 name: node.name,
                 isDirectory: node.isDirectory || isDirectory,
+                directBytes: isLeaf ? entry.size : node.directBytes,
                 isRemoteAvailable: node.isRemoteAvailable || isLeaf,
                 isLocalAvailable: node.isLocalAvailable || localAvailability.contains(currentPath),
                 children: node.children
@@ -464,6 +502,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
             path: nextPath,
             name: component,
             isDirectory: isLeaf ? entry.isDirectory : true,
+            directBytes: isLeaf ? entry.size : 0,
             isRemoteAvailable: isLeaf,
             isLocalAvailable: localAvailability.contains(nextPath),
             children: [:]
@@ -473,6 +512,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
             path: node.path,
             name: node.name,
             isDirectory: node.isDirectory || !isLeaf || entry.isDirectory,
+            directBytes: isLeaf ? entry.size : node.directBytes,
             isRemoteAvailable: node.isRemoteAvailable || isLeaf,
             isLocalAvailable: node.isLocalAvailable || localAvailability.contains(nextPath),
             children: node.children
@@ -485,6 +525,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
                 path: updatedNode.path,
                 name: updatedNode.name,
                 isDirectory: updatedNode.isDirectory,
+                directBytes: updatedNode.directBytes,
                 isRemoteAvailable: updatedNode.isRemoteAvailable,
                 isLocalAvailable: updatedNode.isLocalAvailable,
                 children: nestedChildren
@@ -494,22 +535,30 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         children[nextPath] = updatedNode
     }
 
-    private func materializeNode(_ node: TreeNode) -> SelectiveSyncBrowserNode {
-        let children = node.children.values.sorted(by: Self.sortTreeNodes).map(materializeNode)
+    private func materializeNode(_ node: TreeNode) -> MaterializedNode {
+        let materializedChildren = node.children.values.sorted(by: Self.sortTreeNodes).map(materializeNode)
+        let children = materializedChildren.map(\.node)
+        let aggregatedBytes = node.directBytes + materializedChildren.reduce(into: Int64(0)) { partial, element in
+            partial += element.aggregateBytes
+        }
         let selectionState = selectionState(for: node.path, children: children)
-        let statusText = statusText(for: node, selectionState: selectionState, children: children)
+        let runtimeState = runtimeState(for: node, selectionState: selectionState, children: children)
+        let statusText = statusText(for: runtimeState, node: node)
 
-        return SelectiveSyncBrowserNode(
+        let materializedNode = SelectiveSyncBrowserNode(
             id: node.path,
             path: node.path,
             name: node.name,
             isDirectory: node.isDirectory,
             selectionState: selectionState,
+            runtimeState: runtimeState,
             statusText: statusText,
+            sizeText: byteCountFormatter.string(fromByteCount: aggregatedBytes),
             isLocalAvailable: node.isLocalAvailable,
             isRemoteAvailable: node.isRemoteAvailable,
             children: children
         )
+        return MaterializedNode(node: materializedNode, aggregateBytes: aggregatedBytes)
     }
 
     private func selectionState(for path: String, children: [SelectiveSyncBrowserNode]) -> SelectiveSyncSelectionState {
@@ -529,26 +578,68 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         return .mixed
     }
 
-    private func statusText(for node: TreeNode, selectionState: SelectiveSyncSelectionState, children: [SelectiveSyncBrowserNode]) -> String {
+    private func runtimeState(for node: TreeNode, selectionState: SelectiveSyncSelectionState, children: [SelectiveSyncBrowserNode]) -> SelectiveSyncRuntimeState {
+        if hasConflict(for: node.path) {
+            return .conflict
+        }
+        if let activity = activeTransfer(for: node.path) {
+            return activity == .upload ? .syncingUpload : .syncingDownload
+        }
+
         switch selectionState {
-        case .on:
-            return node.isLocalAvailable ? "Synced locally" : "Selected on this Mac"
         case .mixed:
-            return "Some children selected"
+            return .partiallySelected
+        case .on:
+            return node.isLocalAvailable ? .synced : .selectedPendingDownload
         case .off:
             if node.isLocalAvailable {
-                return "Will be removed on Save"
+                return .pendingRemoval
             }
-            if node.isDirectory, !children.isEmpty {
-                return "Server subtree only"
-            }
-            return "Server only"
+            return .serverOnly
         }
     }
 
     private func pathIsSelected(_ path: String) -> Bool {
         let normalizedPath = normalizeRelativePath(path)
+        if syncEntireRoot {
+            return true
+        }
         return currentIncludedPaths().contains(where: { normalizedPath == $0 || normalizedPath.hasPrefix($0 + "/") })
+    }
+
+    private func statusText(for runtimeState: SelectiveSyncRuntimeState, node: TreeNode) -> String {
+        switch runtimeState {
+        case .synced:
+            return mode == .server ? "Published by server" : "Synced locally"
+        case .selectedPendingDownload:
+            return mode == .server ? "Included in server root" : "Selected, waiting for sync"
+        case .syncingUpload:
+            return "Uploading now"
+        case .syncingDownload:
+            return "Downloading now"
+        case .pendingRemoval:
+            return "Will be removed on Save"
+        case .serverOnly:
+            return node.isDirectory ? "Server subtree only" : "Server only"
+        case .partiallySelected:
+            return "Partially selected"
+        case .conflict:
+            return "Needs attention"
+        }
+    }
+
+    private func hasConflict(for path: String) -> Bool {
+        conflicts.contains { conflict in
+            let candidate = normalizeRelativePath(conflict.relativePath)
+            return candidate == path || candidate.hasPrefix(path + "/")
+        }
+    }
+
+    private func activeTransfer(for path: String) -> NetworkSyncTransferActivity? {
+        activeTransfers.first { candidatePath, _ in
+            let normalized = normalizeRelativePath(candidatePath)
+            return normalized == path || normalized.hasPrefix(path + "/")
+        }?.value
     }
 
     private func deselect(path: String, selectedPaths: inout Set<String>, roots: [SelectiveSyncBrowserNode]) {
@@ -648,6 +739,7 @@ private struct TreeNode: Hashable, Sendable {
     let path: String
     let name: String
     let isDirectory: Bool
+    let directBytes: Int64
     let isRemoteAvailable: Bool
     let isLocalAvailable: Bool
     let children: [String: TreeNode]
@@ -658,6 +750,7 @@ private struct TreeNode: Hashable, Sendable {
                 path: path,
                 name: name,
                 isDirectory: isDirectory,
+                directBytes: directBytes,
                 isRemoteAvailable: isRemoteAvailable,
                 isLocalAvailable: isLocalAvailable,
                 children: newChildren
@@ -675,9 +768,15 @@ private struct TreeNode: Hashable, Sendable {
             path: path,
             name: name,
             isDirectory: isDirectory,
+            directBytes: directBytes,
             isRemoteAvailable: isRemoteAvailable,
             isLocalAvailable: isLocalAvailable,
             children: updatedChildren
         )
     }
+}
+
+private struct MaterializedNode: Sendable {
+    let node: SelectiveSyncBrowserNode
+    let aggregateBytes: Int64
 }

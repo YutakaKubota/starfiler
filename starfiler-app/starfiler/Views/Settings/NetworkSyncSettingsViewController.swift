@@ -21,6 +21,10 @@ final class NetworkSyncSettingsViewController: NSViewController {
     private let chooseRootButton = NSButton(title: "Choose…", target: nil, action: nil)
     private let syncEntireRootCheckBox = NSButton(checkboxWithTitle: "Sync Entire Root", target: nil, action: nil)
     private let refreshTreeButton = NSButton(title: "Refresh Tree", target: nil, action: nil)
+    private let selectAllButton = NSButton(title: "Select All", target: nil, action: nil)
+    private let clearSelectionButton = NSButton(title: "Clear All", target: nil, action: nil)
+    private let expandAllButton = NSButton(title: "Expand All", target: nil, action: nil)
+    private let collapseAllButton = NSButton(title: "Collapse All", target: nil, action: nil)
     private let selectiveSyncSummaryLabel = NSTextField(wrappingLabelWithString: "")
     private let selectiveSyncHintLabel = NSTextField(wrappingLabelWithString: "")
     private let conflictPolicyPopup = NSPopUpButton()
@@ -30,6 +34,7 @@ final class NetworkSyncSettingsViewController: NSViewController {
     private let statusLabel = NSTextField(labelWithString: "")
     private let saveButton = NSButton(title: "Save", target: nil, action: nil)
     private let reloadButton = NSButton(title: "Reload", target: nil, action: nil)
+    private let formScrollView = NSScrollView()
 
     private let selectiveSyncOutlineView = NSOutlineView()
     private let selectiveSyncScrollView = NSScrollView()
@@ -98,6 +103,19 @@ final class NetworkSyncSettingsViewController: NSViewController {
         refreshTreeButton.target = self
         refreshTreeButton.action = #selector(refreshSelectiveSyncTree(_:))
 
+        for button in [selectAllButton, clearSelectionButton, expandAllButton, collapseAllButton] {
+            button.translatesAutoresizingMaskIntoConstraints = false
+            button.bezelStyle = .rounded
+        }
+        selectAllButton.target = self
+        selectAllButton.action = #selector(selectAllSelectiveSyncItems(_:))
+        clearSelectionButton.target = self
+        clearSelectionButton.action = #selector(clearSelectiveSyncItems(_:))
+        expandAllButton.target = self
+        expandAllButton.action = #selector(expandAllSelectiveSyncItems(_:))
+        collapseAllButton.target = self
+        collapseAllButton.action = #selector(collapseAllSelectiveSyncItems(_:))
+
         selectiveSyncSummaryLabel.translatesAutoresizingMaskIntoConstraints = false
         selectiveSyncSummaryLabel.font = .systemFont(ofSize: 12, weight: .medium)
         selectiveSyncSummaryLabel.maximumNumberOfLines = 2
@@ -147,18 +165,24 @@ final class NetworkSyncSettingsViewController: NSViewController {
         nameColumn.width = 340
 
         let statusColumn = NSTableColumn(identifier: .selectiveSyncStatusColumn)
-        statusColumn.title = "Status on This Mac"
+        statusColumn.title = "Sync Status"
         statusColumn.resizingMask = [.autoresizingMask]
-        statusColumn.width = 220
+        statusColumn.width = 240
+
+        let sizeColumn = NSTableColumn(identifier: .selectiveSyncSizeColumn)
+        sizeColumn.title = "Size"
+        sizeColumn.resizingMask = [.autoresizingMask]
+        sizeColumn.width = 120
 
         selectiveSyncOutlineView.translatesAutoresizingMaskIntoConstraints = false
         selectiveSyncOutlineView.addTableColumn(nameColumn)
         selectiveSyncOutlineView.addTableColumn(statusColumn)
+        selectiveSyncOutlineView.addTableColumn(sizeColumn)
         selectiveSyncOutlineView.outlineTableColumn = nameColumn
         selectiveSyncOutlineView.headerView = NSTableHeaderView()
         selectiveSyncOutlineView.delegate = self
         selectiveSyncOutlineView.dataSource = self
-        selectiveSyncOutlineView.rowHeight = 28
+        selectiveSyncOutlineView.rowHeight = 30
         selectiveSyncOutlineView.intercellSpacing = NSSize(width: 8, height: 6)
         selectiveSyncOutlineView.selectionHighlightStyle = .none
         selectiveSyncOutlineView.floatsGroupRows = false
@@ -183,7 +207,14 @@ final class NetworkSyncSettingsViewController: NSViewController {
         rootPathStack.alignment = .centerY
         rootPathStack.translatesAutoresizingMaskIntoConstraints = false
 
-        let selectiveControls = NSStackView(views: [syncEntireRootCheckBox, refreshTreeButton])
+        let selectiveControls = NSStackView(views: [
+            syncEntireRootCheckBox,
+            selectAllButton,
+            clearSelectionButton,
+            expandAllButton,
+            collapseAllButton,
+            refreshTreeButton,
+        ])
         selectiveControls.orientation = .horizontal
         selectiveControls.spacing = 8
         selectiveControls.alignment = .centerY
@@ -200,7 +231,7 @@ final class NetworkSyncSettingsViewController: NSViewController {
         selectiveSyncBody.spacing = 8
         selectiveSyncBody.translatesAutoresizingMaskIntoConstraints = false
 
-        selectiveSyncScrollView.heightAnchor.constraint(equalToConstant: 220).isActive = true
+        selectiveSyncScrollView.heightAnchor.constraint(equalToConstant: 380).isActive = true
 
         let buttonStack = NSStackView(views: [saveButton, reloadButton])
         buttonStack.translatesAutoresizingMaskIntoConstraints = false
@@ -238,13 +269,23 @@ final class NetworkSyncSettingsViewController: NSViewController {
             buttonStack,
         ].forEach { content.addArrangedSubview($0) }
 
-        view.addSubview(content)
+        formScrollView.translatesAutoresizingMaskIntoConstraints = false
+        formScrollView.drawsBackground = false
+        formScrollView.hasVerticalScroller = true
+        formScrollView.documentView = content
+        view.addSubview(formScrollView)
 
         NSLayoutConstraint.activate([
-            content.topAnchor.constraint(equalTo: view.topAnchor, constant: 20),
-            content.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            content.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            content.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor, constant: -20),
+            formScrollView.topAnchor.constraint(equalTo: view.topAnchor),
+            formScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            formScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            formScrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            content.topAnchor.constraint(equalTo: formScrollView.contentView.topAnchor, constant: 20),
+            content.leadingAnchor.constraint(equalTo: formScrollView.contentView.leadingAnchor, constant: 20),
+            content.trailingAnchor.constraint(equalTo: formScrollView.contentView.trailingAnchor, constant: -20),
+            content.bottomAnchor.constraint(equalTo: formScrollView.contentView.bottomAnchor, constant: -20),
+            content.widthAnchor.constraint(equalTo: formScrollView.contentView.widthAnchor, constant: -40),
             selectiveSyncBody.widthAnchor.constraint(equalTo: content.widthAnchor),
         ])
     }
@@ -286,6 +327,10 @@ final class NetworkSyncSettingsViewController: NSViewController {
         let isClient = viewModel.mode == .client
         refreshTreeButton.isEnabled = true
         syncEntireRootCheckBox.isEnabled = isClient
+        selectAllButton.isEnabled = isClient && !viewModel.syncEntireRoot && !viewModel.selectiveSyncNodes.isEmpty
+        clearSelectionButton.isEnabled = isClient && !viewModel.syncEntireRoot
+        expandAllButton.isEnabled = !viewModel.selectiveSyncNodes.isEmpty
+        collapseAllButton.isEnabled = !viewModel.selectiveSyncNodes.isEmpty
         selectiveSyncOutlineView.alphaValue = isClient ? 1 : 0.82
     }
 
@@ -347,6 +392,28 @@ final class NetworkSyncSettingsViewController: NSViewController {
     }
 
     @objc
+    private func selectAllSelectiveSyncItems(_ sender: NSButton) {
+        viewModel.selectAllSelectiveSyncItems()
+    }
+
+    @objc
+    private func clearSelectiveSyncItems(_ sender: NSButton) {
+        viewModel.clearAllSelectiveSyncItems()
+    }
+
+    @objc
+    private func expandAllSelectiveSyncItems(_ sender: NSButton) {
+        expandSelectiveSyncTree()
+    }
+
+    @objc
+    private func collapseAllSelectiveSyncItems(_ sender: NSButton) {
+        for node in viewModel.selectiveSyncNodes {
+            collapseRecursively(node)
+        }
+    }
+
+    @objc
     private func saveChanges(_ sender: NSButton) {
         viewModel.displayName = displayNameField.stringValue
         viewModel.rootPath = rootPathField.stringValue
@@ -372,8 +439,15 @@ final class NetworkSyncSettingsViewController: NSViewController {
             return
         }
 
-        let shouldSelect = node.selectionState == .off
+        let shouldSelect = sender.state != .off
         viewModel.toggleSelectiveNode(path: path, isSelected: shouldSelect)
+    }
+
+    private func collapseRecursively(_ node: SelectiveSyncBrowserNode) {
+        for child in node.children where child.isDirectory {
+            collapseRecursively(child)
+        }
+        selectiveSyncOutlineView.collapseItem(node)
     }
 
     private func node(for path: String, in roots: [SelectiveSyncBrowserNode]) -> SelectiveSyncBrowserNode? {
@@ -475,8 +549,15 @@ extension NetworkSyncSettingsViewController: NSOutlineViewDataSource, NSOutlineV
         switch tableColumn?.identifier {
         case .selectiveSyncStatusColumn:
             let cell = makeStatusCell(for: outlineView)
+            cell.symbolImageView.image = NSImage(systemSymbolName: statusSymbolName(for: node.runtimeState), accessibilityDescription: nil)
+            cell.symbolImageView.contentTintColor = statusColor(for: node.runtimeState)
             cell.textField?.stringValue = node.statusText
-            cell.textField?.textColor = node.isLocalAvailable ? .labelColor : .secondaryLabelColor
+            cell.textField?.textColor = statusColor(for: node.runtimeState)
+            return cell
+        case .selectiveSyncSizeColumn:
+            let cell = makeSizeCell(for: outlineView)
+            cell.textField?.stringValue = node.sizeText
+            cell.textField?.textColor = .secondaryLabelColor
             return cell
         default:
             let cell = makeNameCell(for: outlineView)
@@ -490,6 +571,44 @@ extension NetworkSyncSettingsViewController: NSOutlineViewDataSource, NSOutlineV
             cell.checkboxButton.isEnabled = viewModel.mode == .client && !viewModel.syncEntireRoot
             cell.checkboxButton.identifier = NSUserInterfaceItemIdentifier(node.path)
             return cell
+        }
+    }
+
+    private func statusSymbolName(for runtimeState: SelectiveSyncRuntimeState) -> String {
+        switch runtimeState {
+        case .synced:
+            return "checkmark.circle.fill"
+        case .selectedPendingDownload:
+            return "clock.badge.checkmark"
+        case .syncingUpload:
+            return "arrow.up.circle.fill"
+        case .syncingDownload:
+            return "arrow.down.circle.fill"
+        case .pendingRemoval:
+            return "trash.circle"
+        case .serverOnly:
+            return "externaldrive.badge.icloud"
+        case .partiallySelected:
+            return "circle.lefthalf.filled"
+        case .conflict:
+            return "exclamationmark.triangle.fill"
+        }
+    }
+
+    private func statusColor(for runtimeState: SelectiveSyncRuntimeState) -> NSColor {
+        switch runtimeState {
+        case .synced:
+            return .systemGreen
+        case .selectedPendingDownload:
+            return .systemOrange
+        case .syncingUpload, .syncingDownload:
+            return .systemBlue
+        case .pendingRemoval:
+            return .systemRed
+        case .serverOnly, .partiallySelected:
+            return .secondaryLabelColor
+        case .conflict:
+            return .systemOrange
         }
     }
 
@@ -516,19 +635,29 @@ extension NetworkSyncSettingsViewController: NSOutlineViewDataSource, NSOutlineV
         return cell
     }
 
-    private func makeStatusCell(for outlineView: NSOutlineView) -> NSTableCellView {
-        if let existing = outlineView.makeView(withIdentifier: .selectiveSyncStatusCell, owner: self) as? NSTableCellView {
+    private func makeStatusCell(for outlineView: NSOutlineView) -> SelectiveSyncStatusCellView {
+        if let existing = outlineView.makeView(withIdentifier: .selectiveSyncStatusCell, owner: self) as? SelectiveSyncStatusCellView {
+            return existing
+        }
+
+        let cell = SelectiveSyncStatusCellView()
+        cell.identifier = .selectiveSyncStatusCell
+        return cell
+    }
+
+    private func makeSizeCell(for outlineView: NSOutlineView) -> NSTableCellView {
+        if let existing = outlineView.makeView(withIdentifier: .selectiveSyncSizeCell, owner: self) as? NSTableCellView {
             return existing
         }
 
         let cell = NSTableCellView()
-        cell.identifier = .selectiveSyncStatusCell
+        cell.identifier = .selectiveSyncSizeCell
 
         let label = NSTextField(labelWithString: "")
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.font = .systemFont(ofSize: 11)
-        label.lineBreakMode = .byTruncatingTail
-        label.maximumNumberOfLines = 1
+        label.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        label.alignment = .right
+        label.lineBreakMode = .byTruncatingHead
         cell.textField = label
         cell.addSubview(label)
 
@@ -580,9 +709,49 @@ private final class SelectiveSyncNameCellView: NSTableCellView {
     }
 }
 
+private final class SelectiveSyncStatusCellView: NSTableCellView {
+    let symbolImageView = NSImageView()
+
+    init() {
+        super.init(frame: .zero)
+        translatesAutoresizingMaskIntoConstraints = false
+
+        symbolImageView.translatesAutoresizingMaskIntoConstraints = false
+        symbolImageView.symbolConfiguration = .init(pointSize: 12, weight: .semibold)
+
+        let label = NSTextField(labelWithString: "")
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = .systemFont(ofSize: 11, weight: .medium)
+        label.lineBreakMode = .byTruncatingTail
+        label.maximumNumberOfLines = 1
+        self.textField = label
+
+        addSubview(symbolImageView)
+        addSubview(label)
+
+        NSLayoutConstraint.activate([
+            symbolImageView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            symbolImageView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            symbolImageView.widthAnchor.constraint(equalToConstant: 14),
+            symbolImageView.heightAnchor.constraint(equalToConstant: 14),
+
+            label.leadingAnchor.constraint(equalTo: symbolImageView.trailingAnchor, constant: 6),
+            label.trailingAnchor.constraint(equalTo: trailingAnchor),
+            label.centerYAnchor.constraint(equalTo: centerYAnchor),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+}
+
 private extension NSUserInterfaceItemIdentifier {
     static let selectiveSyncNameColumn = NSUserInterfaceItemIdentifier("SelectiveSyncNameColumn")
     static let selectiveSyncStatusColumn = NSUserInterfaceItemIdentifier("SelectiveSyncStatusColumn")
+    static let selectiveSyncSizeColumn = NSUserInterfaceItemIdentifier("SelectiveSyncSizeColumn")
     static let selectiveSyncNameCell = NSUserInterfaceItemIdentifier("SelectiveSyncNameCell")
     static let selectiveSyncStatusCell = NSUserInterfaceItemIdentifier("SelectiveSyncStatusCell")
+    static let selectiveSyncSizeCell = NSUserInterfaceItemIdentifier("SelectiveSyncSizeCell")
 }

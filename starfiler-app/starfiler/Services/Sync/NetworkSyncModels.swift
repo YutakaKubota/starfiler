@@ -5,6 +5,11 @@ enum NetworkSyncTransferDirection: String, Codable, Sendable {
     case download
 }
 
+enum NetworkSyncTransferActivity: String, Codable, Sendable {
+    case upload
+    case download
+}
+
 enum NetworkSyncRuntimeStatus: String, Codable, Sendable {
     case disabled
     case starting
@@ -57,13 +62,15 @@ struct NetworkSyncRuntimeSnapshot: Sendable {
     var peers: [NetworkSyncPeerRuntime]
     var conflicts: [NetworkSyncConflictRecord]
     var transfers: [NetworkSyncTransferRecord]
+    var activeTransfers: [String: NetworkSyncTransferActivity]
 
     static let disabled = NetworkSyncRuntimeSnapshot(
         status: .disabled,
         detail: "Network sync is disabled.",
         peers: [],
         conflicts: [],
-        transfers: []
+        transfers: [],
+        activeTransfers: [:]
     )
 }
 
@@ -72,10 +79,12 @@ struct NetworkSyncHelloPayload: Codable, Sendable {
     var displayName: String
     var mode: SyncNodeMode
     var protocolVersion: Int
+    var syncEntireRoot: Bool
     var includedPaths: [String]
 }
 
 struct NetworkSyncStateRequestPayload: Codable, Sendable {
+    var syncEntireRoot: Bool
     var includedPaths: [String]
 }
 

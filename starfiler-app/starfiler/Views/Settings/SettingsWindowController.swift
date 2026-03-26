@@ -26,13 +26,13 @@ final class SettingsWindowController: NSWindowController {
         advancedVC: AdvancedSettingsViewController
     ) {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 760, height: 620),
+            contentRect: NSRect(x: 0, y: 0, width: 1120, height: 820),
             styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Settings"
-        window.minSize = NSSize(width: 680, height: 520)
+        window.minSize = NSSize(width: 920, height: 700)
 
         super.init(window: window)
 
