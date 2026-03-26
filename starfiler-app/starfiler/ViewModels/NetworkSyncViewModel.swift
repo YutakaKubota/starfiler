@@ -1023,3 +1023,21 @@ private struct MaterializedNode: Sendable {
     let aggregateBytes: Int64
     let latestModificationTimestamp: TimeInterval?
 }
+
+// MARK: - Remote File Node
+
+struct SyncRemoteFileNode: Sendable {
+    let relativePath: String
+    let name: String
+    let isDirectory: Bool
+    let size: Int64?
+    var isSynced: Bool
+    var children: [SyncRemoteFileNode]
+
+    var formattedSize: String {
+        guard let size, !isDirectory else { return "" }
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: size)
+    }
+}

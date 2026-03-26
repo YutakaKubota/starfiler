@@ -217,6 +217,7 @@
 		CC000000000000000000008D /* SyncStatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000008D /* SyncStatusBarController.swift */; };
 		CC000000000000000000008E /* SyncStatusPopoverViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000008E /* SyncStatusPopoverViewController.swift */; };
 		CC000000000000000000008F /* NetworkSyncSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000008F /* NetworkSyncSettingsViewController.swift */; };
+		CC0000000000000000000090 /* SelectiveSyncViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000090 /* SelectiveSyncViewController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -451,6 +452,7 @@
 		BB000000000000000000008D /* SyncStatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncStatusBarController.swift; sourceTree = "<group>"; };
 		BB000000000000000000008E /* SyncStatusPopoverViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncStatusPopoverViewController.swift; sourceTree = "<group>"; };
 		BB000000000000000000008F /* NetworkSyncSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkSyncSettingsViewController.swift; sourceTree = "<group>"; };
+		BB0000000000000000000090 /* SelectiveSyncViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectiveSyncViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1338,6 +1340,7 @@
 				CC000000000000000000008D /* SyncStatusBarController.swift in Sources */,
 				CC000000000000000000008E /* SyncStatusPopoverViewController.swift in Sources */,
 				CC000000000000000000008F /* NetworkSyncSettingsViewController.swift in Sources */,
+				CC0000000000000000000090 /* SelectiveSyncViewController.swift in Sources */,
 				95DC124F2E566D7FC0F5A7E2 /* TaskCenterEntry.swift in Sources */,
 				D2D7B2A18F78C9CD87D8BA4B /* TaskCenterViewModel.swift in Sources */,
 				F62B990D1CDE6CB6E6DB412B /* TaskCenterPopoverViewController.swift in Sources */,

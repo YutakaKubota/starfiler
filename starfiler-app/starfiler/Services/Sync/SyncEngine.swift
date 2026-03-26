@@ -14,7 +14,9 @@ protocol SyncEngineProviding: Sendable {
     var transferProgressStream: AsyncStream<SyncTransferProgress> { get }
     var conflictStream: AsyncStream<SyncConflict> { get }
     var peerEventStream: AsyncStream<SyncPeerEvent> { get }
+    var remoteSnapshotStream: AsyncStream<(SyncPeerID, [StateSnapshotEntry])> { get }
     func resolveConflict(relativePath: String, resolution: SyncConflictResolution) async
+    func requestRemoteFileList(from peerID: SyncPeerID) async
 }
 
 // MARK: - Sync Engine
@@ -46,11 +48,13 @@ actor SyncEngine: SyncEngineProviding {
     private var transferContinuation: AsyncStream<SyncTransferProgress>.Continuation?
     private var conflictContinuation: AsyncStream<SyncConflict>.Continuation?
     private var peerEventContinuation: AsyncStream<SyncPeerEvent>.Continuation?
+    private var remoteSnapshotContinuation: AsyncStream<(SyncPeerID, [StateSnapshotEntry])>.Continuation?
 
     nonisolated let statusStream: AsyncStream<SyncEngineStatus>
     nonisolated let transferProgressStream: AsyncStream<SyncTransferProgress>
     nonisolated let conflictStream: AsyncStream<SyncConflict>
     nonisolated let peerEventStream: AsyncStream<SyncPeerEvent>
+    nonisolated let remoteSnapshotStream: AsyncStream<(SyncPeerID, [StateSnapshotEntry])>
 
     init(
         discoveryService: any SyncDiscovering = SyncDiscoveryService(),
@@ -79,9 +83,11 @@ actor SyncEngine: SyncEngineProviding {
         self.conflictStream = AsyncStream { c in cCont = c }
         var pCont: AsyncStream<SyncPeerEvent>.Continuation!
         self.peerEventStream = AsyncStream { c in pCont = c }
+        var rCont: AsyncStream<(SyncPeerID, [StateSnapshotEntry])>.Continuation!
+        self.remoteSnapshotStream = AsyncStream { c in rCont = c }
 
         Task {
-            await self.storeContinuations(sCont, tCont, cCont, pCont)
+            await self.storeContinuations(sCont, tCont, cCont, pCont, rCont)
         }
     }
 
@@ -89,12 +95,14 @@ actor SyncEngine: SyncEngineProviding {
         _ s: AsyncStream<SyncEngineStatus>.Continuation,
         _ t: AsyncStream<SyncTransferProgress>.Continuation,
         _ c: AsyncStream<SyncConflict>.Continuation,
-        _ p: AsyncStream<SyncPeerEvent>.Continuation
+        _ p: AsyncStream<SyncPeerEvent>.Continuation,
+        _ r: AsyncStream<(SyncPeerID, [StateSnapshotEntry])>.Continuation
     ) {
         self.statusContinuation = s
         self.transferContinuation = t
         self.conflictContinuation = c
         self.peerEventContinuation = p
+        self.remoteSnapshotContinuation = r
     }
 
     // MARK: - Lifecycle
@@ -182,6 +190,11 @@ actor SyncEngine: SyncEngineProviding {
         isPaused = false
         statusContinuation?.yield(.idle)
         logger.info("Sync engine resumed")
+    }
+
+    func requestRemoteFileList(from peerID: SyncPeerID) async {
+        let request = SyncMessage.stateSnapshotRequest(StateSnapshotRequestPayload(sinceVersion: nil))
+        try? await connectionService.send(request, to: peerID)
     }
 
     func resolveConflict(relativePath: String, resolution: SyncConflictResolution) async {
@@ -619,6 +632,9 @@ actor SyncEngine: SyncEngineProviding {
     }
 
     private func handleStateSnapshot(from peerID: SyncPeerID, payload: StateSnapshotPayload) async {
+        // Publish full snapshot for UI (selective sync file browser)
+        remoteSnapshotContinuation?.yield((peerID, payload.entries))
+
         guard let config, let syncRootURL else { return }
 
         // Compare with local state to find differences
