@@ -28,6 +28,7 @@ final class ConfigManager {
         static let bookmarksConfig = "Bookmarks.json"
         static let batchRenamePresetsConfig = "BatchRenamePresets.json"
         static let syncletsConfig = "Synclets.json"
+        static let networkSyncConfig = "NetworkSync.json"
         static let visitHistoryConfig = "VisitHistory.json"
         static let pinnedItemsConfig = "PinnedItems.json"
         static let terminalSessionsConfig = "TerminalSessions.json"
@@ -125,6 +126,18 @@ final class ConfigManager {
 
     var syncletsConfigURL: URL {
         configDirectory.appendingPathComponent(FileName.syncletsConfig, isDirectory: false)
+    }
+
+    func loadNetworkSyncConfig() -> NetworkSyncConfig {
+        load(NetworkSyncConfig.self, from: networkSyncConfigURL) ?? NetworkSyncConfig()
+    }
+
+    func saveNetworkSyncConfig(_ config: NetworkSyncConfig) throws {
+        try save(config, to: networkSyncConfigURL)
+    }
+
+    var networkSyncConfigURL: URL {
+        configDirectory.appendingPathComponent(FileName.networkSyncConfig, isDirectory: false)
     }
 
     func loadVisitHistoryConfig() -> VisitHistoryConfig {
@@ -302,6 +315,7 @@ final class ConfigManager {
             FileName.bookmarksConfig,
             FileName.batchRenamePresetsConfig,
             FileName.syncletsConfig,
+            FileName.networkSyncConfig,
             FileName.visitHistoryConfig,
             FileName.pinnedItemsConfig,
             FileName.terminalSessionsConfig,
