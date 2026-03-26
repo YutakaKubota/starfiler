@@ -66,6 +66,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var observedConfigSnapshots: [ObservedConfigFile: ConfigFileSnapshot] = [:]
     private let disableAnimations: Bool
     private let persistLaunchMetadata: Bool
+    private var isConstrainingWindowFrame = false
+    private var hasPendingWindowFrameConstraint = false
     private enum ExternalSessionImport {
         static let maxSessions = 200
         static let codexRelativePath = ".codex/sessions"
@@ -255,6 +257,28 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             return
         }
         attachWindowControlButtons(to: window)
+        scheduleWindowFrameConstraintIfNeeded(for: window)
+    }
+
+    func windowDidResize(_ notification: Notification) {
+        guard let window else {
+            return
+        }
+        scheduleWindowFrameConstraintIfNeeded(for: window)
+    }
+
+    func windowDidMove(_ notification: Notification) {
+        guard let window else {
+            return
+        }
+        scheduleWindowFrameConstraintIfNeeded(for: window)
+    }
+
+    func windowDidChangeScreen(_ notification: Notification) {
+        guard let window else {
+            return
+        }
+        scheduleWindowFrameConstraintIfNeeded(for: window)
     }
 
     func performAction(_ block: (MainViewModel) -> Void) {
@@ -682,6 +706,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         if !window.setFrameUsingName("MainWindow") {
             window.center()
         }
+        constrainWindowFrameToVisibleScreenIfNeeded(window)
 
         mainSplitViewController.onSpotlightSearchScopeChanged = { [weak self] scope in
             self?.updateSpotlightSearchScope(scope)
@@ -1485,6 +1510,58 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     private static func clampedSidebarWidth(_ value: CGFloat) -> CGFloat {
         min(max(value, CGFloat(AppConfig.sidebarWidthRange.lowerBound)), CGFloat(AppConfig.sidebarWidthRange.upperBound))
+    }
+
+    private func scheduleWindowFrameConstraintIfNeeded(for window: NSWindow) {
+        guard !hasPendingWindowFrameConstraint else {
+            return
+        }
+
+        hasPendingWindowFrameConstraint = true
+        DispatchQueue.main.async { [weak self, weak window] in
+            guard let self else {
+                return
+            }
+
+            self.hasPendingWindowFrameConstraint = false
+            guard let window else {
+                return
+            }
+
+            self.constrainWindowFrameToVisibleScreenIfNeeded(window)
+        }
+    }
+
+    private func constrainWindowFrameToVisibleScreenIfNeeded(_ window: NSWindow) {
+        guard !isConstrainingWindowFrame, !window.styleMask.contains(.fullScreen) else {
+            return
+        }
+
+        let fallbackVisibleFrame = NSScreen.main?.visibleFrame ?? window.frame
+        let visibleFrame = window.screen?.visibleFrame ?? fallbackVisibleFrame
+        let constrainedFrame = Self.constrainedWindowFrame(window.frame, within: visibleFrame)
+        guard constrainedFrame != window.frame else {
+            return
+        }
+
+        isConstrainingWindowFrame = true
+        window.setFrame(constrainedFrame, display: true)
+        isConstrainingWindowFrame = false
+    }
+
+    static func constrainedWindowFrame(_ frame: NSRect, within visibleFrame: NSRect) -> NSRect {
+        guard visibleFrame.width > 0, visibleFrame.height > 0 else {
+            return frame
+        }
+
+        let width = min(frame.width, visibleFrame.width)
+        let height = min(frame.height, visibleFrame.height)
+        let maxX = visibleFrame.maxX - width
+        let maxY = visibleFrame.maxY - height
+        let x = min(max(frame.minX, visibleFrame.minX), maxX)
+        let y = min(max(frame.minY, visibleFrame.minY), maxY)
+
+        return NSRect(x: x, y: y, width: width, height: height).integral
     }
 
     private static func initialSidebarWidth(appConfig: AppConfig, bookmarksConfig: BookmarksConfig) -> CGFloat {
