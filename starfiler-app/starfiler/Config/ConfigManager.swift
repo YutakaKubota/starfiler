@@ -130,6 +130,7 @@ final class ConfigManager {
     }
 
     func loadNetworkSyncConfig() -> NetworkSyncConfig {
+        migrateLegacyNetworkSyncConfigIfNeeded()
         let loadedConfig = load(NetworkSyncConfig.self, from: networkSyncConfigURL) ?? NetworkSyncConfig()
         return normalizedNetworkSyncConfig(loadedConfig)
     }
@@ -139,7 +140,7 @@ final class ConfigManager {
     }
 
     var networkSyncConfigURL: URL {
-        configDirectory.appendingPathComponent(FileName.networkSyncConfig, isDirectory: false)
+        networkSyncConfigDirectory.appendingPathComponent(FileName.networkSyncConfig, isDirectory: false)
     }
 
     func networkSyncRuntimeDirectory(rootPath: String? = nil) -> URL {
@@ -171,6 +172,10 @@ final class ConfigManager {
             normalized.rootPath = normalized.effectiveRootPath
         }
         return normalized
+    }
+
+    var sharedNetworkSyncConfigURL: URL {
+        configDirectory.appendingPathComponent(FileName.networkSyncConfig, isDirectory: false)
     }
 
     func loadVisitHistoryConfig() -> VisitHistoryConfig {
@@ -213,6 +218,8 @@ final class ConfigManager {
 
     private static let customConfigDirectoryKey = "customConfigDirectory"
     private static let usesUITestSandboxRuntimeDirectory = ProcessInfo.processInfo.arguments.contains("--sandbox-root")
+    private static let usesProcessLocalConfigDirectory = usesUITestSandboxRuntimeDirectory ||
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
     private static func stableDirectoryName(for value: String) -> String {
         let allowed = CharacterSet.alphanumerics
@@ -368,7 +375,6 @@ final class ConfigManager {
             FileName.bookmarksConfig,
             FileName.batchRenamePresetsConfig,
             FileName.syncletsConfig,
-            FileName.networkSyncConfig,
             FileName.visitHistoryConfig,
             FileName.pinnedItemsConfig,
             FileName.terminalSessionsConfig,
@@ -456,6 +462,54 @@ final class ConfigManager {
             .appendingPathComponent("Config", isDirectory: true)
     }
 
+    private var networkSyncConfigDirectory: URL {
+        let baseDirectory: URL
+        if Self.usesProcessLocalConfigDirectory {
+            baseDirectory = configDirectory.appendingPathComponent(".network-sync-local", isDirectory: true)
+        } else {
+            baseDirectory = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+                ?? configDirectory.deletingLastPathComponent()
+        }
+
+        return baseDirectory
+            .appendingPathComponent(bundleIdentifier, isDirectory: true)
+            .appendingPathComponent("LocalConfig", isDirectory: true)
+    }
+
+    private func migrateLegacyNetworkSyncConfigIfNeeded() {
+        let destinationURL = networkSyncConfigURL
+        guard !fileManager.fileExists(atPath: destinationURL.path) else {
+            return
+        }
+
+        let sourceURL = sharedNetworkSyncConfigURL
+        guard sourceURL.standardizedFileURL != destinationURL.standardizedFileURL,
+              fileManager.fileExists(atPath: sourceURL.path)
+        else {
+            return
+        }
+
+        guard !fileManager.fileExists(atPath: destinationURL.deletingLastPathComponent().path) else {
+            copyLegacyNetworkSyncConfigIfPossible(from: sourceURL, to: destinationURL)
+            return
+        }
+
+        do {
+            try fileManager.createDirectory(at: destinationURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            copyLegacyNetworkSyncConfigIfPossible(from: sourceURL, to: destinationURL)
+        } catch {
+            return
+        }
+    }
+
+    private func copyLegacyNetworkSyncConfigIfPossible(from sourceURL: URL, to destinationURL: URL) {
+        do {
+            try fileManager.copyItem(at: sourceURL, to: destinationURL)
+        } catch {
+            // Keep the legacy shared config untouched if local migration fails.
+        }
+    }
+
     private func createConfigDirectoryIfNeeded() {
         guard !fileManager.fileExists(atPath: configDirectory.path) else {
             return
@@ -480,6 +534,9 @@ final class ConfigManager {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(value)
+        if !fileManager.fileExists(atPath: url.deletingLastPathComponent().path) {
+            try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        }
         try data.write(to: url, options: [.atomic])
     }
 }

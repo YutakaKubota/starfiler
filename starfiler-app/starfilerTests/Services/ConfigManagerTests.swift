@@ -257,6 +257,7 @@ final class ConfigManagerTests: XCTestCase {
           "peers": []
         }
         """
+        try FileManager.default.createDirectory(at: sut.networkSyncConfigURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try legacyJSON.data(using: .utf8)?.write(to: sut.networkSyncConfigURL)
 
         let loaded = sut.loadNetworkSyncConfig()
@@ -265,6 +266,32 @@ final class ConfigManagerTests: XCTestCase {
         XCTAssertEqual(loaded.discoveryScope, "default")
         XCTAssertFalse(loaded.syncEntireRoot)
         XCTAssertEqual(loaded.includedPaths, ["docs"])
+    }
+
+    func testLoadNetworkSyncConfigMigratesLegacySharedConfigToLocalStorage() throws {
+        let legacyJSON = """
+        {
+          "isEnabled": true,
+          "mode": "server",
+          "displayName": "Shared Legacy",
+          "rootPath": "/tmp/server-root",
+          "includedPaths": [],
+          "conflictPolicy": "keepBoth",
+          "heartbeatIntervalSeconds": 20,
+          "syncDebounceSeconds": 1.2,
+          "peers": []
+        }
+        """
+        try legacyJSON.data(using: .utf8)?.write(to: sut.sharedNetworkSyncConfigURL)
+
+        let loaded = sut.loadNetworkSyncConfig()
+
+        XCTAssertEqual(loaded.displayName, "Shared Legacy")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: sut.networkSyncConfigURL.path))
+        XCTAssertNotEqual(
+            sut.networkSyncConfigURL.deletingLastPathComponent().standardizedFileURL,
+            sut.configDirectory.standardizedFileURL
+        )
     }
 
     func testSaveAndLoadNetworkSyncConfigPreservesEmptyExplicitSelection() throws {
@@ -303,6 +330,14 @@ final class ConfigManagerTests: XCTestCase {
         XCTAssertTrue(sut.syncletsConfigURL.path.hasSuffix("Synclets.json"))
         XCTAssertTrue(sut.visitHistoryConfigURL.path.hasSuffix("VisitHistory.json"))
         XCTAssertTrue(sut.pinnedItemsConfigURL.path.hasSuffix("PinnedItems.json"))
+    }
+
+    func testNetworkSyncConfigURLUsesLocalStorageDirectory() {
+        XCTAssertTrue(sut.networkSyncConfigURL.path.hasSuffix("NetworkSync.json"))
+        XCTAssertNotEqual(
+            sut.networkSyncConfigURL.deletingLastPathComponent().standardizedFileURL,
+            sut.configDirectory.standardizedFileURL
+        )
     }
 
     func testDefaultFallbackConfigDirectoryUsesICloudDotfilesPath() {
