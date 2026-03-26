@@ -135,6 +135,8 @@ final class NetworkSyncService: NetworkSyncControlling {
                     self.updateStatus(.idle, detail: "Server is advertising on the local network.")
                 case .client:
                     self.loadClientState()
+                    self.clientState.materializedPaths = Set(self.localSnapshot.keys)
+                    self.saveClientState()
                     self.startClientBrowser()
                     self.updateStatus(.offline, detail: "Searching for a Starfiler sync server…")
                 }
@@ -220,6 +222,8 @@ final class NetworkSyncService: NetworkSyncControlling {
                 let latestSnapshot = try scanEntries(at: rootURL)
                 let changes = diff(old: localSnapshot, new: latestSnapshot)
                 localSnapshot = latestSnapshot
+                clientState.materializedPaths = Set(latestSnapshot.keys)
+                saveClientState()
                 try pushClientChanges(changes)
             }
         } catch {
@@ -467,9 +471,7 @@ final class NetworkSyncService: NetworkSyncControlling {
             publishSnapshot()
         case .stateRequest:
             guard config.mode == .server else { return }
-            let request = try envelope.decode(NetworkSyncStateRequestPayload.self, decoder: decoder)
             let entries = serverState.entries.values
-                .filter { shouldSyncPath($0.relativePath, includedPaths: request.includedPaths) }
                 .sorted { $0.relativePath < $1.relativePath }
             try sendEnvelope(.make(.stateSnapshot, payload: NetworkSyncStateSnapshotPayload(entries: entries), encoder: encoder), over: context.connection)
         case .stateSnapshot:
@@ -520,9 +522,22 @@ final class NetworkSyncService: NetworkSyncControlling {
     private func applyServerSnapshot(_ entries: [NetworkSyncFileEntry], over connection: NWConnection) throws {
         let remoteEntries = Dictionary(uniqueKeysWithValues: entries.map { ($0.relativePath, $0) })
         let currentLocal = try scanEntries(at: rootURL!)
-        let localChanges = diffAgainstKnown(known: clientState.knownEntries, local: currentLocal)
+        let trackedKnownEntries = clientState.knownEntries.filter { clientState.materializedPaths.contains($0.key) }
+        let localChanges = diffAgainstKnown(known: trackedKnownEntries, local: currentLocal)
 
         for change in localChanges {
+            let relativePath: String
+            switch change {
+            case .upsert(let entry):
+                relativePath = entry.relativePath
+            case .delete(let path):
+                relativePath = path
+            }
+
+            guard shouldSyncPath(relativePath, includedPaths: config.includedPaths) else {
+                continue
+            }
+
             switch change {
             case .upsert(let entry):
                 try sendFile(entry: entry, baseRevision: clientState.knownEntries[entry.relativePath]?.revision ?? 0, over: connection)
@@ -540,10 +555,15 @@ final class NetworkSyncService: NetworkSyncControlling {
         for entry in remoteEntries.values.sorted(by: { $0.relativePath < $1.relativePath }) {
             guard shouldSyncPath(entry.relativePath, includedPaths: config.includedPaths) else {
                 clientState.knownEntries[entry.relativePath] = entry
+                clientState.materializedPaths.remove(entry.relativePath)
                 continue
             }
 
-            if hasUnsyncedLocalChange(path: entry.relativePath, currentLocal: currentLocal) {
+            if hasUnsyncedLocalChange(
+                path: entry.relativePath,
+                currentLocal: currentLocal,
+                materializedPaths: clientState.materializedPaths
+            ) {
                 continue
             }
 
@@ -575,8 +595,9 @@ final class NetworkSyncService: NetworkSyncControlling {
             )
         }
 
-        saveClientState()
         localSnapshot = try scanEntries(at: rootURL!)
+        clientState.materializedPaths = Set(localSnapshot.keys)
+        saveClientState()
         updateStatus(.idle, detail: "Connected to \(peerRuntimes.values.first?.name ?? "server").")
     }
 
@@ -585,7 +606,11 @@ final class NetworkSyncService: NetworkSyncControlling {
 
         let relativePath = incoming.start.relativePath
         let currentLocal = try scanEntries(at: rootURL)
-        if hasUnsyncedLocalChange(path: relativePath, currentLocal: currentLocal) {
+        if hasUnsyncedLocalChange(
+            path: relativePath,
+            currentLocal: currentLocal,
+            materializedPaths: clientState.materializedPaths
+        ) {
             try createLocalConflictCopy(for: relativePath, currentLocal: currentLocal)
         }
 
@@ -603,8 +628,9 @@ final class NetworkSyncService: NetworkSyncControlling {
             deleted: false
         )
         clientState.knownEntries[relativePath] = entry
-        saveClientState()
         localSnapshot = try scanEntries(at: rootURL)
+        clientState.materializedPaths = Set(localSnapshot.keys)
+        saveClientState()
         appendTransfer(relativePath: relativePath, direction: .download, status: "Completed", progress: 1, detail: "Downloaded from server")
     }
 
@@ -612,7 +638,11 @@ final class NetworkSyncService: NetworkSyncControlling {
         guard let rootURL else { return }
 
         let currentLocal = try scanEntries(at: rootURL)
-        if hasUnsyncedLocalChange(path: payload.relativePath, currentLocal: currentLocal) {
+        if hasUnsyncedLocalChange(
+            path: payload.relativePath,
+            currentLocal: currentLocal,
+            materializedPaths: clientState.materializedPaths
+        ) {
             try createLocalConflictCopy(for: payload.relativePath, currentLocal: currentLocal)
         }
 
@@ -634,8 +664,9 @@ final class NetworkSyncService: NetworkSyncControlling {
             deleted: true
         )
         clientState.knownEntries[payload.relativePath] = tombstone
-        saveClientState()
         localSnapshot = try scanEntries(at: rootURL)
+        clientState.materializedPaths = Set(localSnapshot.keys)
+        saveClientState()
         appendTransfer(relativePath: payload.relativePath, direction: .download, status: "Deleted", progress: nil, detail: "Applied server deletion")
     }
 
@@ -760,6 +791,18 @@ final class NetworkSyncService: NetworkSyncControlling {
         }
 
         for change in changes {
+            let relativePath: String
+            switch change {
+            case .upsert(let entry):
+                relativePath = entry.relativePath
+            case .delete(let path):
+                relativePath = path
+            }
+
+            guard shouldSyncPath(relativePath, includedPaths: config.includedPaths) else {
+                continue
+            }
+
             switch change {
             case .upsert(let entry):
                 try sendFile(entry: entry, baseRevision: clientState.knownEntries[entry.relativePath]?.revision ?? 0, over: connection)
@@ -968,7 +1011,11 @@ final class NetworkSyncService: NetworkSyncControlling {
         }
     }
 
-    private func hasUnsyncedLocalChange(path: String, currentLocal: [String: NetworkSyncFileEntry]) -> Bool {
+    private func hasUnsyncedLocalChange(
+        path: String,
+        currentLocal: [String: NetworkSyncFileEntry],
+        materializedPaths: Set<String>
+    ) -> Bool {
         let knownEntry = clientState.knownEntries[path]
         let localEntry = currentLocal[path]
         switch (knownEntry, localEntry) {
@@ -977,6 +1024,9 @@ final class NetworkSyncService: NetworkSyncControlling {
         case (nil, let localEntry?):
             return !localEntry.deleted
         case (let knownEntry?, nil):
+            guard materializedPaths.contains(path) else {
+                return false
+            }
             return !knownEntry.deleted
         case (nil, nil):
             return false

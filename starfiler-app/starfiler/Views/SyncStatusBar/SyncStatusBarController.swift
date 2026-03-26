@@ -69,6 +69,8 @@ protocol SyncStatusBarPresenting: AnyObject {
     var onDidChange: (() -> Void)? { get set }
 
     func requestRefresh()
+    @discardableResult func addDidChangeObserver(_ observer: @escaping @MainActor () -> Void) -> UUID
+    func removeDidChangeObserver(_ token: UUID)
 }
 
 @MainActor
@@ -79,6 +81,7 @@ final class SyncStatusBarController: NSObject {
     private let popover: NSPopover
     private let viewModel: any SyncStatusBarPresenting
     private weak var popoverViewController: SyncStatusPopoverViewController?
+    private var changeObserverToken: UUID?
 
     init(viewModel: any SyncStatusBarPresenting) {
         self.viewModel = viewModel
@@ -151,11 +154,9 @@ final class SyncStatusBarController: NSObject {
     }
 
     private func bindViewModel() {
-        viewModel.onDidChange = { [weak self] in
-            Task { @MainActor in
-                self?.refreshStatus()
-                self?.popoverViewController?.reload(using: self?.viewModel)
-            }
+        changeObserverToken = viewModel.addDidChangeObserver { [weak self] in
+            self?.refreshStatus()
+            self?.popoverViewController?.reload(using: self?.viewModel)
         }
     }
 

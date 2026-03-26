@@ -164,8 +164,30 @@ struct NetworkSyncServerState: Codable, Sendable {
 
 struct NetworkSyncClientState: Codable, Sendable {
     var knownEntries: [String: NetworkSyncFileEntry]
+    var materializedPaths: Set<String>
 
-    init(knownEntries: [String: NetworkSyncFileEntry] = [:]) {
+    init(
+        knownEntries: [String: NetworkSyncFileEntry] = [:],
+        materializedPaths: Set<String> = []
+    ) {
         self.knownEntries = knownEntries
+        self.materializedPaths = materializedPaths
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case knownEntries
+        case materializedPaths
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        knownEntries = try container.decodeIfPresent([String: NetworkSyncFileEntry].self, forKey: .knownEntries) ?? [:]
+        materializedPaths = try container.decodeIfPresent(Set<String>.self, forKey: .materializedPaths) ?? []
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(knownEntries, forKey: .knownEntries)
+        try container.encode(materializedPaths, forKey: .materializedPaths)
     }
 }
