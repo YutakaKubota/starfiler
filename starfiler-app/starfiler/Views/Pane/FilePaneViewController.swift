@@ -225,6 +225,12 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
 
     private static let browserModeIconSize: CGFloat = 16
     private static let browserModeRowHeight: CGFloat = max(24, browserModeIconSize + 8)
+    private static let browserNameColumnDefaultWidth: CGFloat = 440
+    private static let browserSizeColumnDefaultWidth: CGFloat = 120
+    private static let browserModifiedColumnDefaultWidth: CGFloat = 180
+    private static let browserNameColumnMinimumWidth: CGFloat = 120
+    private static let browserSizeColumnMinimumWidth: CGFloat = 52
+    private static let browserModifiedColumnMinimumWidth: CGFloat = 84
 
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -349,6 +355,11 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
         configureContextMenu()
         bindViewModel()
         setActive(false)
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        adjustBrowserColumnWidthsIfNeeded()
     }
 
     deinit {
@@ -1048,18 +1059,18 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
 
         let nameColumn = NSTableColumn(identifier: Column.name)
         nameColumn.title = "Name"
-        nameColumn.width = 440
-        nameColumn.minWidth = 180
+        nameColumn.width = Self.browserNameColumnDefaultWidth
+        nameColumn.minWidth = Self.browserNameColumnMinimumWidth
 
         let sizeColumn = NSTableColumn(identifier: Column.size)
         sizeColumn.title = "Size"
-        sizeColumn.width = 120
-        sizeColumn.minWidth = 80
+        sizeColumn.width = Self.browserSizeColumnDefaultWidth
+        sizeColumn.minWidth = Self.browserSizeColumnMinimumWidth
 
         let modifiedColumn = NSTableColumn(identifier: Column.modified)
         modifiedColumn.title = "Modified"
-        modifiedColumn.width = 180
-        modifiedColumn.minWidth = 140
+        modifiedColumn.width = Self.browserModifiedColumnDefaultWidth
+        modifiedColumn.minWidth = Self.browserModifiedColumnMinimumWidth
 
         tableView.addTableColumn(nameColumn)
         tableView.addTableColumn(sizeColumn)
@@ -1079,6 +1090,81 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
             self?.updateSearchFieldAppearance()
             self?.onDidRequestActivate?()
         }
+    }
+
+    private func adjustBrowserColumnWidthsIfNeeded() {
+        guard currentDisplayMode == .browser else {
+            return
+        }
+
+        let availableWidth = scrollView.contentView.bounds.width
+        guard availableWidth > 0 else {
+            return
+        }
+
+        let targetWidths = Self.browserColumnWidths(
+            availableWidth: availableWidth,
+            intercellSpacing: tableView.intercellSpacing.width
+        )
+
+        applyColumnWidth(targetWidths.name, identifier: Column.name)
+        applyColumnWidth(targetWidths.size, identifier: Column.size)
+        applyColumnWidth(targetWidths.modified, identifier: Column.modified)
+    }
+
+    private func applyColumnWidth(_ width: CGFloat, identifier: NSUserInterfaceItemIdentifier) {
+        guard let column = tableView.tableColumns.first(where: { $0.identifier == identifier }) else {
+            return
+        }
+
+        let clampedWidth = max(width, 1)
+        guard abs(column.width - clampedWidth) >= 1 else {
+            return
+        }
+
+        column.width = clampedWidth
+    }
+
+    static func browserColumnWidths(
+        availableWidth: CGFloat,
+        intercellSpacing: CGFloat
+    ) -> (name: CGFloat, size: CGFloat, modified: CGFloat) {
+        let columnCount = CGFloat(3)
+        let totalSpacing = intercellSpacing * (columnCount - 1)
+        let availableColumnsWidth = max(availableWidth - totalSpacing, 0)
+
+        var nameWidth = browserNameColumnDefaultWidth
+        var sizeWidth = browserSizeColumnDefaultWidth
+        var modifiedWidth = browserModifiedColumnDefaultWidth
+        let desiredTotalWidth = nameWidth + sizeWidth + modifiedWidth
+
+        if availableColumnsWidth >= desiredTotalWidth {
+            nameWidth += availableColumnsWidth - desiredTotalWidth
+            return (nameWidth, sizeWidth, modifiedWidth)
+        }
+
+        var overflow = desiredTotalWidth - availableColumnsWidth
+
+        let modifiedReduction = min(overflow, modifiedWidth - browserModifiedColumnMinimumWidth)
+        modifiedWidth -= modifiedReduction
+        overflow -= modifiedReduction
+
+        let sizeReduction = min(overflow, sizeWidth - browserSizeColumnMinimumWidth)
+        sizeWidth -= sizeReduction
+        overflow -= sizeReduction
+
+        let nameReduction = min(overflow, nameWidth - browserNameColumnMinimumWidth)
+        nameWidth -= nameReduction
+        overflow -= nameReduction
+
+        if overflow > 0 {
+            let scale = availableColumnsWidth / max(nameWidth + sizeWidth + modifiedWidth, 1)
+            nameWidth = floor(nameWidth * scale)
+            sizeWidth = floor(sizeWidth * scale)
+            modifiedWidth = max(availableColumnsWidth - nameWidth - sizeWidth, 1)
+        }
+
+        return (nameWidth, sizeWidth, modifiedWidth)
     }
 
     private func configureCollectionView() {
