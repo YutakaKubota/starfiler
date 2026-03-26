@@ -35,11 +35,11 @@ struct SelectiveSyncBrowserNode: Identifiable, Hashable, Sendable {
 @MainActor
 @Observable
 final class NetworkSyncViewModel: SyncStatusBarPresenting {
-    var isEnabled: Bool
-    var mode: SyncNodeMode
+    var serverEnabled: Bool
+    var clientEnabled: Bool
     var displayName: String
-    var rootPath: String
-    var includedPathsText: String
+    var serverRootPath: String
+    var clientRootPath: String
     var conflictPolicy: NetworkSyncConflictPolicy
     var heartbeatIntervalSeconds: Double
     var syncDebounceSeconds: Double
@@ -54,10 +54,10 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
     var recentTransfers: [SyncTransferSummary] = []
     var onDidChange: (() -> Void)?
 
-    var syncEntireRoot: Bool
+    var clientSyncEntireRoot: Bool
     var selectiveSyncNodes: [SelectiveSyncBrowserNode] = []
-    var selectiveSyncSummary: String = "Syncs the whole root."
-    var selectiveSyncHint: String = "Client mode can browse the server snapshot after the first connection."
+    var selectiveSyncSummary: String = "Client syncs the whole root."
+    var selectiveSyncHint: String = "Enable the client role to browse the latest server snapshot."
 
     private let configManager: ConfigManager
     private let peerSummaryDateFormatter: DateFormatter
@@ -67,6 +67,10 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
     private var activeTransfers: [String: NetworkSyncTransferActivity] = [:]
     private let byteCountFormatter: ByteCountFormatter
     private var changeObservers: [UUID: @MainActor () -> Void] = [:]
+
+    var isEnabled: Bool {
+        serverEnabled || clientEnabled
+    }
 
     init(
         configManager: ConfigManager = ConfigManager(),
@@ -85,20 +89,21 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
 
         let loadedConfig = configManager.loadNetworkSyncConfig()
         self.config = loadedConfig
-        self.isEnabled = loadedConfig.isEnabled
-        self.mode = loadedConfig.mode
+        self.serverEnabled = loadedConfig.serverEnabled
+        self.clientEnabled = loadedConfig.clientEnabled
         self.displayName = loadedConfig.displayName
-        self.rootPath = loadedConfig.effectiveRootPath
-        self.includedPathsText = loadedConfig.includedPaths.joined(separator: "\n")
+        self.serverRootPath = loadedConfig.serverEffectiveRootPath
+        self.clientRootPath = loadedConfig.clientEffectiveRootPath
         self.conflictPolicy = loadedConfig.conflictPolicy
         self.heartbeatIntervalSeconds = loadedConfig.heartbeatIntervalSeconds
         self.syncDebounceSeconds = loadedConfig.syncDebounceSeconds
         self.peerSummaries = []
-        self.statusMessage = loadedConfig.isEnabled ? "Sync is enabled" : "Sync is disabled"
-        self.syncEntireRoot = loadedConfig.syncEntireRoot
-        self.service = service ?? NetworkSyncService(
+        self.statusMessage = loadedConfig.isEnabled ? "Network Sync roles are enabled." : "Network Sync is disabled."
+        self.clientSyncEntireRoot = loadedConfig.clientSyncEntireRoot
+        self.service = service ?? NetworkSyncCoordinator(
             configManager: configManager,
-            securityScopedBookmarkService: securityScopedBookmarkService
+            securityScopedBookmarkService: securityScopedBookmarkService,
+            fileManager: fileManager
         )
 
         refreshPeerSummaries()
@@ -113,15 +118,15 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
 
     func reload() {
         config = configManager.loadNetworkSyncConfig()
-        isEnabled = config.isEnabled
-        mode = config.mode
+        serverEnabled = config.serverEnabled
+        clientEnabled = config.clientEnabled
         displayName = config.displayName
-        rootPath = config.effectiveRootPath
-        includedPathsText = config.includedPaths.joined(separator: "\n")
+        serverRootPath = config.serverEffectiveRootPath
+        clientRootPath = config.clientEffectiveRootPath
         conflictPolicy = config.conflictPolicy
         heartbeatIntervalSeconds = config.heartbeatIntervalSeconds
         syncDebounceSeconds = config.syncDebounceSeconds
-        syncEntireRoot = config.syncEntireRoot
+        clientSyncEntireRoot = config.clientSyncEntireRoot
         refreshPeerSummaries()
         refreshSelectiveSyncBrowser()
         statusMessage = "Reloaded from disk"
@@ -135,17 +140,31 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
 
     func save() {
         let sanitizedDisplayName = sanitized(displayName, fallback: Host.current().localizedName ?? ProcessInfo.processInfo.hostName)
-        let sanitizedRootPath = sanitized(rootPath, fallback: mode == .client ? NetworkSyncConfig.defaultClientRootPath : "")
+        let sanitizedServerRootPath = sanitized(serverRootPath)
+        let sanitizedClientRootPath = sanitized(clientRootPath, fallback: NetworkSyncConfig.defaultClientRootPath)
         let sanitizedIncludedPaths = currentIncludedPaths()
 
+        if let validationError = validateRolePaths(
+            serverEnabled: serverEnabled,
+            serverRootPath: sanitizedServerRootPath,
+            clientEnabled: clientEnabled,
+            clientRootPath: sanitizedClientRootPath
+        ) {
+            statusMessage = validationError
+            statusDetail = validationError
+            notifyDidChange()
+            return
+        }
+
         let nextConfig = NetworkSyncConfig(
-            isEnabled: isEnabled,
-            mode: mode,
             displayName: sanitizedDisplayName,
             discoveryScope: config.discoveryScope,
-            rootPath: sanitizedRootPath,
-            syncEntireRoot: syncEntireRoot,
-            includedPaths: sanitizedIncludedPaths,
+            serverEnabled: serverEnabled,
+            serverRootPath: sanitizedServerRootPath,
+            clientEnabled: clientEnabled,
+            clientRootPath: sanitizedClientRootPath,
+            clientSyncEntireRoot: clientSyncEntireRoot,
+            clientIncludedPaths: sanitizedIncludedPaths,
             conflictPolicy: conflictPolicy,
             heartbeatIntervalSeconds: heartbeatIntervalSeconds,
             syncDebounceSeconds: syncDebounceSeconds,
@@ -156,9 +175,9 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
             try configManager.saveNetworkSyncConfig(nextConfig)
             config = nextConfig
             displayName = nextConfig.displayName
-            rootPath = nextConfig.effectiveRootPath
-            syncEntireRoot = nextConfig.syncEntireRoot
-            includedPathsText = nextConfig.includedPaths.joined(separator: "\n")
+            serverRootPath = nextConfig.serverEffectiveRootPath
+            clientRootPath = nextConfig.clientEffectiveRootPath
+            clientSyncEntireRoot = nextConfig.clientSyncEntireRoot
             refreshPeerSummaries()
             refreshSelectiveSyncBrowser()
             statusMessage = "Saved"
@@ -190,19 +209,27 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         service.stop()
     }
 
-    func setMode(_ nextMode: SyncNodeMode) {
-        mode = nextMode
-        applyModeDefaultsIfNeeded()
-        statusMessage = nextMode == .server
-            ? "Server mode publishes a shared root."
-            : "Client mode mirrors selected folders into \(rootPath)."
+    func setServerEnabled(_ enabled: Bool) {
+        serverEnabled = enabled
+        statusMessage = enabled
+            ? "Server role will publish \(sanitized(serverRootPath, fallback: "its configured root"))."
+            : "Server role will stop publishing after Save."
         notifyDidChange()
     }
 
-    func setSyncEntireRoot(_ enabled: Bool) {
-        syncEntireRoot = enabled
-        config.syncEntireRoot = enabled
-        syncIncludedPathsText()
+    func setClientEnabled(_ enabled: Bool) {
+        clientEnabled = enabled
+        applyClientDefaultsIfNeeded()
+        statusMessage = enabled
+            ? "Client role will mirror into \(sanitized(clientRootPath, fallback: NetworkSyncConfig.defaultClientRootPath))."
+            : "Client role will stop mirroring after Save."
+        refreshSelectiveSyncBrowser()
+        notifyDidChange()
+    }
+
+    func setClientSyncEntireRoot(_ enabled: Bool) {
+        clientSyncEntireRoot = enabled
+        config.clientSyncEntireRoot = enabled
         refreshSelectiveSyncBrowser()
         statusMessage = enabled
             ? "Whole-root sync is enabled. Previous explicit selection is preserved."
@@ -210,20 +237,20 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         notifyDidChange()
     }
 
-    func applyModeDefaultsIfNeeded() {
-        if mode == .client && sanitized(rootPath).isEmpty {
-            rootPath = NetworkSyncConfig.defaultClientRootPath
+    func applyClientDefaultsIfNeeded() {
+        if sanitized(clientRootPath).isEmpty {
+            clientRootPath = NetworkSyncConfig.defaultClientRootPath
         }
         refreshSelectiveSyncPreview()
     }
 
     func toggleSelectiveNode(path: String, isSelected: Bool) {
-        if syncEntireRoot && !isSelected {
-            setSyncEntireRoot(false)
+        if clientSyncEntireRoot && !isSelected {
+            setClientSyncEntireRoot(false)
         }
 
-        var selectedPaths = Set(config.includedPaths.map(normalizeRelativePath).filter { !$0.isEmpty })
-        if syncEntireRoot && isSelected {
+        var selectedPaths = Set(config.clientIncludedPaths.map(normalizeRelativePath).filter { !$0.isEmpty })
+        if clientSyncEntireRoot && isSelected {
             return
         }
 
@@ -237,29 +264,26 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
             deselect(path: path, selectedPaths: &selectedPaths, roots: selectiveSyncNodes)
         }
 
-        config.includedPaths = selectedPaths.sorted()
-        config.syncEntireRoot = syncEntireRoot
-        syncIncludedPathsText()
+        config.clientIncludedPaths = selectedPaths.sorted()
+        config.clientSyncEntireRoot = clientSyncEntireRoot
         refreshSelectiveSyncBrowser()
         statusMessage = "Selective sync updated. Save to apply."
         notifyDidChange()
     }
 
     func selectAllSelectiveSyncItems() {
-        syncEntireRoot = false
-        config.syncEntireRoot = false
-        config.includedPaths = selectiveSyncNodes.map(\.path)
-        syncIncludedPathsText()
+        clientSyncEntireRoot = false
+        config.clientSyncEntireRoot = false
+        config.clientIncludedPaths = selectiveSyncNodes.map(\.path)
         refreshSelectiveSyncBrowser()
         statusMessage = "Selected all visible folders and files. Save to apply."
         notifyDidChange()
     }
 
     func clearAllSelectiveSyncItems() {
-        syncEntireRoot = false
-        config.syncEntireRoot = false
-        config.includedPaths = []
-        syncIncludedPathsText()
+        clientSyncEntireRoot = false
+        config.clientSyncEntireRoot = false
+        config.clientIncludedPaths = []
         refreshSelectiveSyncBrowser()
         statusMessage = "Cleared all explicit selections. Save to apply."
         notifyDidChange()
@@ -277,8 +301,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
     }
 
     func refreshSelectiveSyncPreview() {
-        config.includedPaths = currentIncludedPaths()
-        syncIncludedPathsText()
+        config.clientIncludedPaths = currentIncludedPaths()
         refreshSelectiveSyncBrowser()
         notifyDidChange()
     }
@@ -341,20 +364,20 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         let roots = buildTree(entries: entries, localAvailability: localAvailability)
         selectiveSyncNodes = roots.map { materializeNode($0).node }
 
-        if mode == .server {
-            selectiveSyncHint = "Server mode shows the exported root inventory. Clients choose their own sync selection."
+        if !clientEnabled {
+            selectiveSyncHint = "Enable the client role to mirror selected folders onto this Mac."
         } else if selectiveSyncNodes.isEmpty {
             selectiveSyncHint = "Connect once as a client to fetch the server tree, then pick folders or files to keep on this Mac."
-        } else if syncEntireRoot {
+        } else if clientSyncEntireRoot {
             selectiveSyncHint = "Everything under the server root is selected. Turn this off to restore explicit folder picks without losing them."
         } else {
             selectiveSyncHint = "Folder checkboxes apply recursively. Unchecked paths are removed from this Mac after Save."
         }
 
-        if syncEntireRoot {
+        if clientSyncEntireRoot {
             selectiveSyncSummary = selectiveSyncNodes.isEmpty
-                ? "Syncs the whole root when a server snapshot becomes available."
-                : "Syncs the whole root."
+                ? "Client syncs the whole root when a server snapshot becomes available."
+                : "Client syncs the whole root."
         } else if currentIncludedPaths().isEmpty {
             selectiveSyncSummary = "Nothing selected. This Mac keeps no local synced copy until you pick folders."
         } else {
@@ -363,48 +386,26 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
     }
 
     private func currentIncludedPaths() -> [String] {
-        return config.includedPaths
+        return config.clientIncludedPaths
             .map(normalizeRelativePath)
             .filter { !$0.isEmpty }
             .sorted()
     }
 
-    private func syncIncludedPathsText() {
-        includedPathsText = currentIncludedPaths().joined(separator: "\n")
-    }
-
     private func loadAvailableEntries() -> [NetworkSyncFileEntry] {
-        switch mode {
-        case .client:
-            let stateURL = configManager
-                .networkSyncRuntimeDirectory(rootPath: config.effectiveRootPath)
-                .appendingPathComponent("client-state.json")
-            guard let data = try? Data(contentsOf: stateURL),
-                  let state = try? JSONDecoder().decode(NetworkSyncClientState.self, from: data)
-            else {
-                return []
-            }
-            return state.knownEntries.values.filter { !$0.deleted }
-        case .server:
-            let effectiveRootPath = mode == .client ? config.effectiveRootPath : rootPath
-            let trimmedRootPath = normalizeRelativePath(effectiveRootPath)
-            guard !trimmedRootPath.isEmpty else {
-                return []
-            }
-            let stateURL = configManager
-                .networkSyncRuntimeDirectory(rootPath: effectiveRootPath)
-                .appendingPathComponent("server-state.json")
-            guard let data = try? Data(contentsOf: stateURL),
-                  let state = try? JSONDecoder().decode(NetworkSyncServerState.self, from: data)
-            else {
-                return []
-            }
-            return state.entries.values.filter { !$0.deleted }
+        let stateURL = configManager
+            .networkSyncRuntimeDirectory(rootPath: config.clientEffectiveRootPath)
+            .appendingPathComponent("client-state.json")
+        guard let data = try? Data(contentsOf: stateURL),
+              let state = try? JSONDecoder().decode(NetworkSyncClientState.self, from: data)
+        else {
+            return []
         }
+        return state.knownEntries.values.filter { !$0.deleted }
     }
 
     private func loadLocalAvailability() -> Set<String> {
-        let effectiveRootPath = mode == .client ? sanitized(rootPath, fallback: NetworkSyncConfig.defaultClientRootPath) : rootPath
+        let effectiveRootPath = sanitized(clientRootPath, fallback: NetworkSyncConfig.defaultClientRootPath)
         let trimmedRootPath = effectiveRootPath.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedRootPath.isEmpty else {
             return []
@@ -565,7 +566,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
     }
 
     private func selectionState(for path: String, children: [SelectiveSyncBrowserNode]) -> SelectiveSyncSelectionState {
-        if syncEntireRoot || pathIsSelected(path) {
+        if clientSyncEntireRoot || pathIsSelected(path) {
             return .on
         }
         guard !children.isEmpty else {
@@ -604,7 +605,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
 
     private func pathIsSelected(_ path: String) -> Bool {
         let normalizedPath = normalizeRelativePath(path)
-        if syncEntireRoot {
+        if clientSyncEntireRoot {
             return true
         }
         return currentIncludedPaths().contains(where: { normalizedPath == $0 || normalizedPath.hasPrefix($0 + "/") })
@@ -613,9 +614,9 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
     private func statusText(for runtimeState: SelectiveSyncRuntimeState, node: TreeNode) -> String {
         switch runtimeState {
         case .synced:
-            return mode == .server ? "Published by server" : "Synced locally"
+            return "Synced locally"
         case .selectedPendingDownload:
-            return mode == .server ? "Included in server root" : "Selected, waiting for sync"
+            return "Selected, waiting for sync"
         case .syncingUpload:
             return "Uploading now"
         case .syncingDownload:
@@ -659,7 +660,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
             expandSelectionExcluding(targetPath: normalizedPath, from: ancestorNode, into: &selectedPaths)
         } else if let exactNode = findNode(path: normalizedPath, in: roots), exactNode.selectionState == .on {
             selectedPaths.remove(normalizedPath)
-            if selectedPaths.isEmpty && !syncEntireRoot {
+            if selectedPaths.isEmpty && !clientSyncEntireRoot {
                 selectedPaths = Set(roots.filter { $0.path != normalizedPath }.map(\.path))
             }
             if let exactParent = parentPath(of: normalizedPath), let parentNode = findNode(path: exactParent, in: roots), currentIncludedPaths().contains(exactParent) {
@@ -699,6 +700,36 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
             return nil
         }
         return components.dropLast().joined(separator: "/")
+    }
+
+    private func validateRolePaths(
+        serverEnabled: Bool,
+        serverRootPath: String,
+        clientEnabled: Bool,
+        clientRootPath: String
+    ) -> String? {
+        guard serverEnabled, clientEnabled else {
+            return nil
+        }
+
+        let serverURL = URL(
+            fileURLWithPath: UserPaths.expandHomeVariables(in: serverRootPath),
+            isDirectory: true
+        ).standardizedFileURL
+        let clientURL = URL(
+            fileURLWithPath: UserPaths.expandHomeVariables(in: clientRootPath),
+            isDirectory: true
+        ).standardizedFileURL
+
+        let serverPath = serverURL.path
+        let clientPath = clientURL.path
+        if serverPath == clientPath {
+            return "Server root and client sync folder must be different."
+        }
+        if clientPath.hasPrefix(serverPath + "/") || serverPath.hasPrefix(clientPath + "/") {
+            return "Server root and client sync folder must not be nested inside each other."
+        }
+        return nil
     }
 
     private func sanitized(_ value: String, fallback: String = "") -> String {

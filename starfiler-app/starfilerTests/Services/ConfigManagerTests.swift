@@ -264,8 +264,11 @@ final class ConfigManagerTests: XCTestCase {
 
         XCTAssertEqual(loaded.displayName, "Legacy Client")
         XCTAssertEqual(loaded.discoveryScope, "default")
-        XCTAssertFalse(loaded.syncEntireRoot)
-        XCTAssertEqual(loaded.includedPaths, ["docs"])
+        XCTAssertFalse(loaded.serverEnabled)
+        XCTAssertTrue(loaded.clientEnabled)
+        XCTAssertEqual(loaded.clientEffectiveRootPath, "/tmp/legacy-root")
+        XCTAssertFalse(loaded.clientSyncEntireRoot)
+        XCTAssertEqual(loaded.clientIncludedPaths, ["docs"])
     }
 
     func testLoadNetworkSyncConfigMigratesLegacySharedConfigToLocalStorage() throws {
@@ -287,6 +290,8 @@ final class ConfigManagerTests: XCTestCase {
         let loaded = sut.loadNetworkSyncConfig()
 
         XCTAssertEqual(loaded.displayName, "Shared Legacy")
+        XCTAssertTrue(loaded.serverEnabled)
+        XCTAssertEqual(loaded.serverEffectiveRootPath, "/tmp/server-root")
         XCTAssertTrue(FileManager.default.fileExists(atPath: sut.networkSyncConfigURL.path))
         XCTAssertNotEqual(
             sut.networkSyncConfigURL.deletingLastPathComponent().standardizedFileURL,
@@ -296,13 +301,14 @@ final class ConfigManagerTests: XCTestCase {
 
     func testSaveAndLoadNetworkSyncConfigPreservesEmptyExplicitSelection() throws {
         let config = NetworkSyncConfig(
-            isEnabled: true,
-            mode: .client,
             displayName: "Client",
             discoveryScope: "local-smoke",
-            rootPath: "/tmp/client-root",
-            syncEntireRoot: false,
-            includedPaths: [],
+            serverEnabled: false,
+            serverRootPath: "",
+            clientEnabled: true,
+            clientRootPath: "/tmp/client-root",
+            clientSyncEntireRoot: false,
+            clientIncludedPaths: [],
             conflictPolicy: .keepBoth,
             heartbeatIntervalSeconds: 10,
             syncDebounceSeconds: 0.5,
@@ -312,8 +318,9 @@ final class ConfigManagerTests: XCTestCase {
         try sut.saveNetworkSyncConfig(config)
         let loaded = sut.loadNetworkSyncConfig()
 
-        XCTAssertFalse(loaded.syncEntireRoot)
-        XCTAssertEqual(loaded.includedPaths, [])
+        XCTAssertFalse(loaded.clientSyncEntireRoot)
+        XCTAssertEqual(loaded.clientIncludedPaths, [])
+        XCTAssertTrue(loaded.clientEnabled)
         XCTAssertEqual(loaded.discoveryScope, "local-smoke")
     }
 

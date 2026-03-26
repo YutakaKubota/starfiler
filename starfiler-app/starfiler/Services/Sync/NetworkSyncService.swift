@@ -38,6 +38,7 @@ final class NetworkSyncService: NetworkSyncControlling {
     private let serviceType = "_starfiler-sync._tcp"
     private let chunkSize = 64 * 1024
     private let fileHashThresholdBytes: Int64 = 10 * 1024 * 1024
+    private let role: SyncNodeMode
     private let configManager: ConfigManager
     private let securityScopedBookmarkService: any SecurityScopedBookmarkProviding
     private let fileManager: FileManager
@@ -45,7 +46,7 @@ final class NetworkSyncService: NetworkSyncControlling {
     private let decoder: JSONDecoder
     private let deviceID: UUID
 
-    private var config: NetworkSyncConfig
+    private var config: NetworkSyncRoleRuntimeConfig
     private var snapshot: NetworkSyncRuntimeSnapshot = .disabled
     private var listener: NWListener?
     private var browser: NWBrowser?
@@ -65,14 +66,16 @@ final class NetworkSyncService: NetworkSyncControlling {
     private var isApplyingRemoteChange = false
 
     init(
+        role: SyncNodeMode,
         configManager: ConfigManager = ConfigManager(),
         securityScopedBookmarkService: any SecurityScopedBookmarkProviding = SecurityScopedBookmarkService.shared,
         fileManager: FileManager = .default
     ) {
+        self.role = role
         self.configManager = configManager
         self.securityScopedBookmarkService = securityScopedBookmarkService
         self.fileManager = fileManager
-        self.config = configManager.loadNetworkSyncConfig()
+        self.config = configManager.loadNetworkSyncConfig().runtimeConfig(for: role)
 
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -87,7 +90,7 @@ final class NetworkSyncService: NetworkSyncControlling {
 
     func start() {
         stop()
-        config = configManager.loadNetworkSyncConfig()
+        config = configManager.loadNetworkSyncConfig().runtimeConfig(for: role)
 
         guard config.isEnabled else {
             snapshot = .disabled
@@ -115,10 +118,10 @@ final class NetworkSyncService: NetworkSyncControlling {
                 }
 
                 self.snapshot.status = .starting
-                self.snapshot.detail = "Starting \(self.config.mode.displayName.lowercased())…"
+                self.snapshot.detail = "Starting \(self.config.role.displayName.lowercased())…"
                 self.publishSnapshot()
 
-                switch self.config.mode {
+                switch self.config.role {
                 case .server:
                     self.localSnapshot = try self.scanEntries(at: rootURL)
                     self.startPathMonitor(for: rootURL)
@@ -181,7 +184,7 @@ final class NetworkSyncService: NetworkSyncControlling {
     }
 
     func reload(config: NetworkSyncConfig) {
-        self.config = config
+        self.config = config.runtimeConfig(for: role)
         start()
     }
 
@@ -189,7 +192,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         if config.isEnabled, let rootURL {
             do {
                 localSnapshot = try scanEntries(at: rootURL)
-                if config.mode == .client {
+                if config.role == .client {
                     applyFinderBadges(for: localSnapshot.keys, status: .synced)
                 }
             } catch {
@@ -216,7 +219,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         }
 
         do {
-            switch config.mode {
+            switch config.role {
             case .server:
                 localSnapshot = try scanEntries(at: rootURL)
                 try reconcileServerStateWithDisk(broadcast: true, originDeviceID: nil)
@@ -386,7 +389,7 @@ final class NetworkSyncService: NetworkSyncControlling {
 
         switch state {
         case .ready:
-            if config.mode == .client, clientConnectionID == id {
+            if config.role == .client, clientConnectionID == id {
                 peerRuntimes[id]?.state = .connected
                 peerRuntimes[id]?.isConnected = true
                 updateStatus(.idle, detail: "Connected to \(peerRuntimes[id]?.name ?? "server").")
@@ -394,7 +397,7 @@ final class NetworkSyncService: NetworkSyncControlling {
             }
         case .failed(let error):
             removeConnection(id: id)
-            if config.mode == .client {
+            if config.role == .client {
                 updateStatus(.offline, detail: "Connection lost: \(error.localizedDescription)")
             }
         case .cancelled:
@@ -422,7 +425,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         let hello = NetworkSyncHelloPayload(
             deviceID: deviceID,
             displayName: config.displayName,
-            mode: config.mode,
+            mode: config.role,
             protocolVersion: 1,
             syncEntireRoot: config.syncEntireRoot,
             includedPaths: config.includedPaths
@@ -451,7 +454,7 @@ final class NetworkSyncService: NetworkSyncControlling {
 
                 if let error {
                     self.removeConnection(id: id)
-                    if self.config.mode == .client {
+                    if self.config.role == .client {
                         self.updateStatus(.offline, detail: error.localizedDescription)
                     }
                     return
@@ -504,21 +507,21 @@ final class NetworkSyncService: NetworkSyncControlling {
             )
             publishSnapshot()
         case .stateRequest:
-            guard config.mode == .server else { return }
+            guard config.role == .server else { return }
             try sendStateSnapshot(over: context.connection)
         case .stateSnapshot:
-            guard config.mode == .client else { return }
+            guard config.role == .client else { return }
             let payload = try envelope.decode(NetworkSyncStateSnapshotPayload.self, decoder: decoder)
             try applyServerSnapshot(payload.entries, over: context.connection)
         case .fileRequest:
-            guard config.mode == .server else { return }
+            guard config.role == .server else { return }
             let request = try envelope.decode(NetworkSyncFileRequestPayload.self, decoder: decoder)
             guard let entry = serverState.entries[request.relativePath], !entry.deleted else { return }
             try sendFile(entry: entry, baseRevision: entry.revision, over: context.connection)
         case .fileTransferStart:
             let payload = try envelope.decode(NetworkSyncFileTransferStartPayload.self, decoder: decoder)
             context.incomingTransfers[payload.transferID] = IncomingTransfer(start: payload, data: Data())
-            markTransferActive(relativePath: payload.relativePath, activity: config.mode == .server ? .upload : .download)
+            markTransferActive(relativePath: payload.relativePath, activity: config.role == .server ? .upload : .download)
         case .fileTransferChunk:
             let payload = try envelope.decode(NetworkSyncFileTransferChunkPayload.self, decoder: decoder)
             context.incomingTransfers[payload.transferID]?.data.append(payload.data)
@@ -526,14 +529,14 @@ final class NetworkSyncService: NetworkSyncControlling {
             let payload = try envelope.decode(NetworkSyncFileTransferEndPayload.self, decoder: decoder)
             guard let incoming = context.incomingTransfers.removeValue(forKey: payload.transferID) else { return }
             defer { finishTransferActivity(relativePath: incoming.start.relativePath) }
-            if config.mode == .server {
+            if config.role == .server {
                 try applyIncomingClientTransfer(incoming, hash: payload.contentHash, from: context)
             } else {
                 try applyIncomingServerTransfer(incoming, hash: payload.contentHash)
             }
         case .delete:
             let payload = try envelope.decode(NetworkSyncDeletePayload.self, decoder: decoder)
-            if config.mode == .server {
+            if config.role == .server {
                 try applyIncomingClientDeletion(payload, from: context)
             } else {
                 try applyIncomingServerDeletion(payload)
@@ -846,7 +849,7 @@ final class NetworkSyncService: NetworkSyncControlling {
     }
 
     private func pushClientChanges(_ changes: [LocalDiff]) throws {
-        guard config.mode == .client, let connectionID = clientConnectionID, let connection = connections[connectionID]?.connection else {
+        guard config.role == .client, let connectionID = clientConnectionID, let connection = connections[connectionID]?.connection else {
             return
         }
 
@@ -879,7 +882,7 @@ final class NetworkSyncService: NetworkSyncControlling {
     }
 
     private func pruneDeselectedLocalEntriesIfNeeded(at rootURL: URL) throws {
-        guard config.mode == .client, !config.syncEntireRoot else {
+        guard config.role == .client, !config.syncEntireRoot else {
             return
         }
 
@@ -1470,7 +1473,7 @@ final class NetworkSyncService: NetworkSyncControlling {
     }
 
     private func applyFinderBadges(for relativePaths: some Sequence<String>, status: FinderBadgeStatus) {
-        guard config.mode == .client, let rootURL else {
+        guard config.role == .client, let rootURL else {
             return
         }
 
@@ -1488,7 +1491,7 @@ final class NetworkSyncService: NetworkSyncControlling {
     }
 
     private func clearFinderBadge(for relativePath: String) {
-        guard config.mode == .client, let rootURL else {
+        guard config.role == .client, let rootURL else {
             return
         }
 

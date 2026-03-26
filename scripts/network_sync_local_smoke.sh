@@ -71,21 +71,26 @@ SERVER_ROOT="$WORK_DIR/server-root"
 CLIENT_ROOT="$WORK_DIR/client-root"
 SERVER_CONFIG="$WORK_DIR/server-config"
 CLIENT_CONFIG="$WORK_DIR/client-config"
+BUNDLE_ID="com.nilone.starfiler"
+SERVER_LOCAL_CONFIG="$SERVER_CONFIG/.network-sync-local/$BUNDLE_ID/LocalConfig"
+CLIENT_LOCAL_CONFIG="$CLIENT_CONFIG/.network-sync-local/$BUNDLE_ID/LocalConfig"
 SERVER_LOG="$WORK_DIR/server.log"
 CLIENT_LOG="$WORK_DIR/client.log"
 REPORT="$WORK_DIR/verification-report.txt"
 
-mkdir -p "$SERVER_ROOT" "$CLIENT_ROOT" "$SERVER_CONFIG" "$CLIENT_CONFIG" "$SERVER_ROOT/docs" "$SERVER_ROOT/private"
+mkdir -p "$SERVER_ROOT" "$CLIENT_ROOT" "$SERVER_CONFIG" "$CLIENT_CONFIG" "$SERVER_LOCAL_CONFIG" "$CLIENT_LOCAL_CONFIG" "$SERVER_ROOT/docs" "$SERVER_ROOT/private"
 DISCOVERY_SCOPE="local-smoke-$(uuidgen | tr '[:upper:]' '[:lower:]')"
 
-cat > "$SERVER_CONFIG/NetworkSync.json" <<EOF
+cat > "$SERVER_LOCAL_CONFIG/NetworkSync.json" <<EOF
 {
-  "isEnabled": true,
-  "mode": "server",
   "displayName": "Local Smoke Server",
   "discoveryScope": "$DISCOVERY_SCOPE",
-  "rootPath": "$SERVER_ROOT",
-  "includedPaths": [],
+  "serverEnabled": true,
+  "serverRootPath": "$SERVER_ROOT",
+  "clientEnabled": false,
+  "clientRootPath": "$CLIENT_ROOT",
+  "clientSyncEntireRoot": true,
+  "clientIncludedPaths": [],
   "conflictPolicy": "keepBoth",
   "heartbeatIntervalSeconds": 5,
   "syncDebounceSeconds": 0.5,
@@ -93,14 +98,16 @@ cat > "$SERVER_CONFIG/NetworkSync.json" <<EOF
 }
 EOF
 
-cat > "$CLIENT_CONFIG/NetworkSync.json" <<EOF
+cat > "$CLIENT_LOCAL_CONFIG/NetworkSync.json" <<EOF
 {
-  "isEnabled": true,
-  "mode": "client",
   "displayName": "Local Smoke Client",
   "discoveryScope": "$DISCOVERY_SCOPE",
-  "rootPath": "$CLIENT_ROOT",
-  "includedPaths": ["docs"],
+  "serverEnabled": false,
+  "serverRootPath": "",
+  "clientEnabled": true,
+  "clientRootPath": "$CLIENT_ROOT",
+  "clientSyncEntireRoot": false,
+  "clientIncludedPaths": ["docs"],
   "conflictPolicy": "keepBoth",
   "heartbeatIntervalSeconds": 5,
   "syncDebounceSeconds": 0.5,
@@ -118,6 +125,8 @@ Server root: $SERVER_ROOT
 Client root: $CLIENT_ROOT
 Server config: $SERVER_CONFIG
 Client config: $CLIENT_CONFIG
+Server local config: $SERVER_LOCAL_CONFIG/NetworkSync.json
+Client local config: $CLIENT_LOCAL_CONFIG/NetworkSync.json
 EOF
 }
 
@@ -260,9 +269,9 @@ fi
 python3 - <<PY
 import json
 from pathlib import Path
-path = Path("$CLIENT_CONFIG/NetworkSync.json")
+path = Path("$CLIENT_LOCAL_CONFIG/NetworkSync.json")
 data = json.loads(path.read_text())
-data["includedPaths"] = ["docs", "private"]
+data["clientIncludedPaths"] = ["docs", "private"]
 path.write_text(json.dumps(data, indent=2))
 PY
 restart_client
@@ -277,9 +286,9 @@ fi
 python3 - <<PY
 import json
 from pathlib import Path
-path = Path("$CLIENT_CONFIG/NetworkSync.json")
+path = Path("$CLIENT_LOCAL_CONFIG/NetworkSync.json")
 data = json.loads(path.read_text())
-data["includedPaths"] = ["docs"]
+data["clientIncludedPaths"] = ["docs"]
 path.write_text(json.dumps(data, indent=2))
 PY
 restart_client

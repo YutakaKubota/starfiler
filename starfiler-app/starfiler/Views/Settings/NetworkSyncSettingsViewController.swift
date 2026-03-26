@@ -6,19 +6,17 @@ final class NetworkSyncSettingsViewController: NSViewController {
 
     private let titleLabel = NSTextField(labelWithString: "Network Sync")
     private let descriptionLabel = NSTextField(
-        wrappingLabelWithString: "Run one Mac as the server on the external drive. Clients browse that server tree and download checked items into a local sync folder."
+        wrappingLabelWithString: "Enable the server role to publish a shared root, the client role to mirror selected folders locally, or both at once. When both roles run on one Mac, the two roots must stay different and not be nested."
     )
-    private let enabledCheckBox = NSButton(checkboxWithTitle: "Enable network sync", target: nil, action: nil)
-    private let modeControl = NSSegmentedControl(
-        labels: SyncNodeMode.allCases.map(\.displayName),
-        trackingMode: .selectOne,
-        target: nil,
-        action: nil
-    )
+    private let serverEnabledCheckBox = NSButton(checkboxWithTitle: "Run Server Role", target: nil, action: nil)
+    private let clientEnabledCheckBox = NSButton(checkboxWithTitle: "Run Client Role", target: nil, action: nil)
     private let displayNameField = NSTextField()
-    private let rootPathField = NSTextField()
-    private let rootPathHelpLabel = NSTextField(wrappingLabelWithString: "")
-    private let chooseRootButton = NSButton(title: "Choose…", target: nil, action: nil)
+    private let serverRootPathField = NSTextField()
+    private let clientRootPathField = NSTextField()
+    private let serverRootPathHelpLabel = NSTextField(wrappingLabelWithString: "")
+    private let clientRootPathHelpLabel = NSTextField(wrappingLabelWithString: "")
+    private let chooseServerRootButton = NSButton(title: "Choose Server Root…", target: nil, action: nil)
+    private let chooseClientRootButton = NSButton(title: "Choose Client Folder…", target: nil, action: nil)
     private let syncEntireRootCheckBox = NSButton(checkboxWithTitle: "Sync Entire Root", target: nil, action: nil)
     private let refreshTreeButton = NSButton(title: "Refresh Tree", target: nil, action: nil)
     private let selectAllButton = NSButton(title: "Select All", target: nil, action: nil)
@@ -68,31 +66,44 @@ final class NetworkSyncSettingsViewController: NSViewController {
         descriptionLabel.translatesAutoresizingMaskIntoConstraints = false
         descriptionLabel.font = .systemFont(ofSize: 12)
         descriptionLabel.textColor = .secondaryLabelColor
-        descriptionLabel.maximumNumberOfLines = 3
+        descriptionLabel.maximumNumberOfLines = 4
 
-        enabledCheckBox.translatesAutoresizingMaskIntoConstraints = false
-        enabledCheckBox.target = self
-        enabledCheckBox.action = #selector(toggleEnabled(_:))
+        serverEnabledCheckBox.translatesAutoresizingMaskIntoConstraints = false
+        serverEnabledCheckBox.target = self
+        serverEnabledCheckBox.action = #selector(toggleServerEnabled(_:))
 
-        modeControl.translatesAutoresizingMaskIntoConstraints = false
-        modeControl.target = self
-        modeControl.action = #selector(changeMode(_:))
+        clientEnabledCheckBox.translatesAutoresizingMaskIntoConstraints = false
+        clientEnabledCheckBox.target = self
+        clientEnabledCheckBox.action = #selector(toggleClientEnabled(_:))
 
         displayNameField.translatesAutoresizingMaskIntoConstraints = false
         displayNameField.placeholderString = "Display name shown to other Macs"
 
-        rootPathField.translatesAutoresizingMaskIntoConstraints = false
-        rootPathField.placeholderString = "/Volumes/HD-AD6U3/Shared"
+        serverRootPathField.translatesAutoresizingMaskIntoConstraints = false
+        serverRootPathField.placeholderString = "/Volumes/HD-AD6U3/StarFilerSync"
 
-        rootPathHelpLabel.translatesAutoresizingMaskIntoConstraints = false
-        rootPathHelpLabel.font = .systemFont(ofSize: 11)
-        rootPathHelpLabel.textColor = .secondaryLabelColor
-        rootPathHelpLabel.maximumNumberOfLines = 3
+        clientRootPathField.translatesAutoresizingMaskIntoConstraints = false
+        clientRootPathField.placeholderString = NetworkSyncConfig.defaultClientRootPath
 
-        chooseRootButton.translatesAutoresizingMaskIntoConstraints = false
-        chooseRootButton.bezelStyle = .rounded
-        chooseRootButton.target = self
-        chooseRootButton.action = #selector(chooseRootPath(_:))
+        serverRootPathHelpLabel.translatesAutoresizingMaskIntoConstraints = false
+        serverRootPathHelpLabel.font = .systemFont(ofSize: 11)
+        serverRootPathHelpLabel.textColor = .secondaryLabelColor
+        serverRootPathHelpLabel.maximumNumberOfLines = 3
+
+        clientRootPathHelpLabel.translatesAutoresizingMaskIntoConstraints = false
+        clientRootPathHelpLabel.font = .systemFont(ofSize: 11)
+        clientRootPathHelpLabel.textColor = .secondaryLabelColor
+        clientRootPathHelpLabel.maximumNumberOfLines = 3
+
+        chooseServerRootButton.translatesAutoresizingMaskIntoConstraints = false
+        chooseServerRootButton.bezelStyle = .rounded
+        chooseServerRootButton.target = self
+        chooseServerRootButton.action = #selector(chooseServerRootPath(_:))
+
+        chooseClientRootButton.translatesAutoresizingMaskIntoConstraints = false
+        chooseClientRootButton.bezelStyle = .rounded
+        chooseClientRootButton.target = self
+        chooseClientRootButton.action = #selector(chooseClientRootPath(_:))
 
         syncEntireRootCheckBox.translatesAutoresizingMaskIntoConstraints = false
         syncEntireRootCheckBox.target = self
@@ -201,11 +212,17 @@ final class NetworkSyncSettingsViewController: NSViewController {
         peersScrollView.hasVerticalScroller = true
         peersScrollView.documentView = peersTextView
 
-        let rootPathStack = NSStackView(views: [rootPathField, chooseRootButton])
-        rootPathStack.orientation = .horizontal
-        rootPathStack.spacing = 8
-        rootPathStack.alignment = .centerY
-        rootPathStack.translatesAutoresizingMaskIntoConstraints = false
+        let serverRootPathStack = NSStackView(views: [serverRootPathField, chooseServerRootButton])
+        serverRootPathStack.orientation = .horizontal
+        serverRootPathStack.spacing = 8
+        serverRootPathStack.alignment = .centerY
+        serverRootPathStack.translatesAutoresizingMaskIntoConstraints = false
+
+        let clientRootPathStack = NSStackView(views: [clientRootPathField, chooseClientRootButton])
+        clientRootPathStack.orientation = .horizontal
+        clientRootPathStack.spacing = 8
+        clientRootPathStack.alignment = .centerY
+        clientRootPathStack.translatesAutoresizingMaskIntoConstraints = false
 
         let selectiveControls = NSStackView(views: [
             syncEntireRootCheckBox,
@@ -233,6 +250,31 @@ final class NetworkSyncSettingsViewController: NSViewController {
 
         selectiveSyncScrollView.heightAnchor.constraint(equalToConstant: 380).isActive = true
 
+        let serverRoleBody = NSStackView(views: [
+            serverEnabledCheckBox,
+            labeledRow(title: "Shared Root", field: serverRootPathStack),
+            serverRootPathHelpLabel,
+        ])
+        serverRoleBody.orientation = .vertical
+        serverRoleBody.alignment = .leading
+        serverRoleBody.spacing = 8
+        serverRoleBody.translatesAutoresizingMaskIntoConstraints = false
+
+        let clientRoleBody = NSStackView(views: [
+            clientEnabledCheckBox,
+            labeledRow(title: "Local Sync Folder", field: clientRootPathStack),
+            clientRootPathHelpLabel,
+            labeledSection(
+                title: "Selective Sync",
+                detail: "Turn off whole-root sync to choose folders or files from the latest server snapshot. Unchecked paths stay on the server and are removed from this Mac after Save.",
+                body: selectiveSyncBody
+            ),
+        ])
+        clientRoleBody.orientation = .vertical
+        clientRoleBody.alignment = .leading
+        clientRoleBody.spacing = 8
+        clientRoleBody.translatesAutoresizingMaskIntoConstraints = false
+
         let buttonStack = NSStackView(views: [saveButton, reloadButton])
         buttonStack.translatesAutoresizingMaskIntoConstraints = false
         buttonStack.orientation = .horizontal
@@ -247,15 +289,16 @@ final class NetworkSyncSettingsViewController: NSViewController {
         [
             titleLabel,
             descriptionLabel,
-            enabledCheckBox,
-            labeledRow(title: "Mode", field: modeControl),
             labeledRow(title: "Display Name", field: displayNameField),
-            labeledRow(title: "Root Path", field: rootPathStack),
-            rootPathHelpLabel,
             labeledSection(
-                title: "Selective Sync",
-                detail: "Turn off whole-root sync to choose folders or files from the latest server snapshot. Unchecked paths stay on the server and are removed from this Mac after Save.",
-                body: selectiveSyncBody
+                title: "Server Role",
+                detail: "Publish the authoritative shared root to other Macs on the local network. Use this on the Mac attached to HD-ADU3 or another always-mounted volume.",
+                body: serverRoleBody
+            ),
+            labeledSection(
+                title: "Client Role",
+                detail: "Mirror selected folders from the server onto this Mac. This can run alongside the server role when the two roots are separate.",
+                body: clientRoleBody
             ),
             labeledRow(title: "Conflict Policy", field: conflictPolicyPopup),
             labeledRow(title: "Heartbeat (sec)", field: heartbeatField),
@@ -297,19 +340,15 @@ final class NetworkSyncSettingsViewController: NSViewController {
     }
 
     private func refreshFromViewModel() {
-        descriptionLabel.stringValue = viewModel.mode == .server
-            ? "Server mode turns this Mac into the authoritative sync host. Other Macs discover it on the LAN and mirror from this root."
-            : "Client mode mirrors checked folders from the server onto this Mac. The local sync destination defaults to ~/StarFilerSync."
-        enabledCheckBox.state = viewModel.isEnabled ? .on : .off
-        modeControl.selectedSegment = SyncNodeMode.allCases.firstIndex(of: viewModel.mode) ?? 0
+        descriptionLabel.stringValue = rolesDescription()
+        serverEnabledCheckBox.state = viewModel.serverEnabled ? .on : .off
+        clientEnabledCheckBox.state = viewModel.clientEnabled ? .on : .off
         displayNameField.stringValue = viewModel.displayName
-        rootPathField.stringValue = viewModel.rootPath
-        rootPathField.placeholderString = viewModel.mode == .server
-            ? "/Volumes/HD-AD6U3/Shared"
-            : NetworkSyncConfig.defaultClientRootPath
-        chooseRootButton.title = viewModel.mode == .server ? "Choose Server Root…" : "Choose Local Sync Folder…"
-        rootPathHelpLabel.stringValue = rootPathHelpText()
-        syncEntireRootCheckBox.state = viewModel.syncEntireRoot ? .on : .off
+        serverRootPathField.stringValue = viewModel.serverRootPath
+        clientRootPathField.stringValue = viewModel.clientRootPath
+        serverRootPathHelpLabel.stringValue = serverRootHelpText()
+        clientRootPathHelpLabel.stringValue = clientRootHelpText()
+        syncEntireRootCheckBox.state = viewModel.clientSyncEntireRoot ? .on : .off
         selectiveSyncSummaryLabel.stringValue = "Selection: \(viewModel.selectiveSyncSummary)"
         selectiveSyncHintLabel.stringValue = viewModel.selectiveSyncHint
         conflictPolicyPopup.selectItem(withTitle: viewModel.conflictPolicy.displayName)
@@ -324,11 +363,11 @@ final class NetworkSyncSettingsViewController: NSViewController {
     }
 
     private func refreshSelectiveSyncControls() {
-        let isClient = viewModel.mode == .client
-        refreshTreeButton.isEnabled = true
+        let isClient = viewModel.clientEnabled
+        refreshTreeButton.isEnabled = isClient
         syncEntireRootCheckBox.isEnabled = isClient
-        selectAllButton.isEnabled = isClient && !viewModel.syncEntireRoot && !viewModel.selectiveSyncNodes.isEmpty
-        clearSelectionButton.isEnabled = isClient && !viewModel.syncEntireRoot
+        selectAllButton.isEnabled = isClient && !viewModel.clientSyncEntireRoot && !viewModel.selectiveSyncNodes.isEmpty
+        clearSelectionButton.isEnabled = isClient && !viewModel.clientSyncEntireRoot
         expandAllButton.isEnabled = !viewModel.selectiveSyncNodes.isEmpty
         collapseAllButton.isEnabled = !viewModel.selectiveSyncNodes.isEmpty
         selectiveSyncOutlineView.alphaValue = isClient ? 1 : 0.82
@@ -348,45 +387,43 @@ final class NetworkSyncSettingsViewController: NSViewController {
     }
 
     @objc
-    private func toggleEnabled(_ sender: NSButton) {
-        viewModel.isEnabled = sender.state == .on
+    private func toggleServerEnabled(_ sender: NSButton) {
+        viewModel.setServerEnabled(sender.state == .on)
     }
 
     @objc
-    private func changeMode(_ sender: NSSegmentedControl) {
-        let selectedIndex = max(sender.selectedSegment, 0)
-        viewModel.setMode(SyncNodeMode.allCases[selectedIndex])
+    private func toggleClientEnabled(_ sender: NSButton) {
+        viewModel.setClientEnabled(sender.state == .on)
     }
 
     @objc
-    private func chooseRootPath(_ sender: NSButton) {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.canCreateDirectories = true
-        panel.prompt = "Choose Root"
-        if !rootPathField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            panel.directoryURL = URL(fileURLWithPath: UserPaths.expandHomeVariables(in: rootPathField.stringValue))
-        }
-
-        guard panel.runModal() == .OK, let selectedURL = panel.url?.standardizedFileURL else {
+    private func chooseServerRootPath(_ sender: NSButton) {
+        guard let selectedURL = chooseDirectory(initialPath: serverRootPathField.stringValue, prompt: "Choose Server Root") else {
             return
         }
+        serverRootPathField.stringValue = selectedURL.path
+        viewModel.serverRootPath = selectedURL.path
+    }
 
-        rootPathField.stringValue = selectedURL.path
-        viewModel.rootPath = selectedURL.path
+    @objc
+    private func chooseClientRootPath(_ sender: NSButton) {
+        guard let selectedURL = chooseDirectory(initialPath: clientRootPathField.stringValue, prompt: "Choose Client Folder") else {
+            return
+        }
+        clientRootPathField.stringValue = selectedURL.path
+        viewModel.clientRootPath = selectedURL.path
+        viewModel.applyClientDefaultsIfNeeded()
         viewModel.refreshSelectiveSyncPreview()
     }
 
     @objc
     private func toggleSyncEntireRoot(_ sender: NSButton) {
-        viewModel.setSyncEntireRoot(sender.state == .on)
+        viewModel.setClientSyncEntireRoot(sender.state == .on)
     }
 
     @objc
     private func refreshSelectiveSyncTree(_ sender: NSButton) {
-        viewModel.rootPath = rootPathField.stringValue
+        viewModel.clientRootPath = clientRootPathField.stringValue
         viewModel.refreshSelectiveSyncPreview()
         viewModel.requestRefresh()
     }
@@ -416,7 +453,8 @@ final class NetworkSyncSettingsViewController: NSViewController {
     @objc
     private func saveChanges(_ sender: NSButton) {
         viewModel.displayName = displayNameField.stringValue
-        viewModel.rootPath = rootPathField.stringValue
+        viewModel.serverRootPath = serverRootPathField.stringValue
+        viewModel.clientRootPath = clientRootPathField.stringValue
         if let rawValue = conflictPolicyPopup.selectedItem?.representedObject as? String,
            let policy = NetworkSyncConflictPolicy(rawValue: rawValue) {
             viewModel.conflictPolicy = policy
@@ -434,8 +472,7 @@ final class NetworkSyncSettingsViewController: NSViewController {
     @objc
     private func toggleSelectiveSyncItem(_ sender: NSButton) {
         guard let path = sender.identifier?.rawValue,
-              let node = node(for: path, in: viewModel.selectiveSyncNodes)
-        else {
+              node(for: path, in: viewModel.selectiveSyncNodes) != nil else {
             return
         }
 
@@ -475,13 +512,41 @@ final class NetworkSyncSettingsViewController: NSViewController {
             .joined(separator: "\n\n")
     }
 
-    private func rootPathHelpText() -> String {
-        switch viewModel.mode {
-        case .server:
-            return "Server mode: this folder is the authoritative shared root. Put it on HD-AD6U3 or another always-mounted volume."
-        case .client:
-            return "Client mode: checked folders and files are downloaded into this local folder. Default is \(NetworkSyncConfig.defaultClientRootPath)."
+    private func rolesDescription() -> String {
+        switch (viewModel.serverEnabled, viewModel.clientEnabled) {
+        case (true, true):
+            return "This Mac is publishing a shared root and mirroring checked folders locally. Keep the server root and client folder separate so changes do not loop back into each other."
+        case (true, false):
+            return "This Mac is acting as the authoritative server. Other Macs can discover it on the LAN and sync from the published shared root."
+        case (false, true):
+            return "This Mac is acting as a client. Checked folders are mirrored from the server into the local sync folder."
+        case (false, false):
+            return "Enable the server role to publish a shared root, the client role to mirror selected folders locally, or both at once."
         }
+    }
+
+    private func serverRootHelpText() -> String {
+        "Server role: this folder is the authoritative shared root. Put it on HD-ADU3 or another always-mounted volume."
+    }
+
+    private func clientRootHelpText() -> String {
+        "Client role: checked folders and files are downloaded into this local folder. Default is \(NetworkSyncConfig.defaultClientRootPath)."
+    }
+
+    private func chooseDirectory(initialPath: String, prompt: String) -> URL? {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.prompt = prompt
+        if !initialPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            panel.directoryURL = URL(fileURLWithPath: UserPaths.expandHomeVariables(in: initialPath))
+        }
+        guard panel.runModal() == .OK, let selectedURL = panel.url?.standardizedFileURL else {
+            return nil
+        }
+        return selectedURL
     }
 
     private func labeledRow(title: String, field: NSView) -> NSView {
@@ -505,7 +570,7 @@ final class NetworkSyncSettingsViewController: NSViewController {
         let detailLabel = NSTextField(wrappingLabelWithString: detail)
         detailLabel.font = .systemFont(ofSize: 11)
         detailLabel.textColor = .secondaryLabelColor
-        detailLabel.maximumNumberOfLines = 3
+        detailLabel.maximumNumberOfLines = 4
 
         let stack = NSStackView(views: [titleLabel, detailLabel, body])
         stack.orientation = .vertical
@@ -568,7 +633,7 @@ extension NetworkSyncSettingsViewController: NSOutlineViewDataSource, NSOutlineV
             cell.checkboxButton.title = node.name
             cell.checkboxButton.state = checkboxState(for: node.selectionState)
             cell.checkboxButton.allowsMixedState = true
-            cell.checkboxButton.isEnabled = viewModel.mode == .client && !viewModel.syncEntireRoot
+            cell.checkboxButton.isEnabled = viewModel.clientEnabled && !viewModel.clientSyncEntireRoot
             cell.checkboxButton.identifier = NSUserInterfaceItemIdentifier(node.path)
             return cell
         }

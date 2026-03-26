@@ -168,9 +168,8 @@ final class ConfigManager {
 
     private func normalizedNetworkSyncConfig(_ config: NetworkSyncConfig) -> NetworkSyncConfig {
         var normalized = config
-        if normalized.mode == .client {
-            normalized.rootPath = normalized.effectiveRootPath
-        }
+        normalized.serverRootPath = normalized.serverEffectiveRootPath
+        normalized.clientRootPath = normalized.clientEffectiveRootPath
         return normalized
     }
 
