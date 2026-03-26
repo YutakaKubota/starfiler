@@ -78,6 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         buildMainMenu()
         launchTask = Task { @MainActor in
             await launchMainWindow()
+            await setupNetworkSync()
             launchTask = nil
         }
     }

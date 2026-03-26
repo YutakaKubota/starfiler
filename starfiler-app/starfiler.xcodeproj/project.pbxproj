@@ -201,6 +201,22 @@
 		EE000000000000000000A004 /* MockPinnedItemsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF000000000000000000A004 /* MockPinnedItemsService.swift */; };
 		F016B2D6D61C5A95006BC61B /* NetworkSyncConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34E6D910DB48D66D13C3A506 /* NetworkSyncConfig.swift */; };
 		F62B990D1CDE6CB6E6DB412B /* TaskCenterPopoverViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 203ECE8A9D19B20DB7058AB6 /* TaskCenterPopoverViewController.swift */; };
+		CC0000000000000000000080 /* NetworkSyncModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000080 /* NetworkSyncModels.swift */; };
+		CC0000000000000000000081 /* NetworkSyncConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000081 /* NetworkSyncConfig.swift */; };
+		CC0000000000000000000082 /* SyncMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000082 /* SyncMessage.swift */; };
+		CC0000000000000000000083 /* SyncMessageCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000083 /* SyncMessageCodec.swift */; };
+		CC0000000000000000000084 /* SyncDiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000084 /* SyncDiscoveryService.swift */; };
+		CC0000000000000000000085 /* SyncConnectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000085 /* SyncConnectionService.swift */; };
+		CC0000000000000000000086 /* FSEventsChangeDetectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000086 /* FSEventsChangeDetectionService.swift */; };
+		CC0000000000000000000087 /* SyncStateDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000087 /* SyncStateDatabase.swift */; };
+		CC0000000000000000000088 /* SyncDeltaComputationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000088 /* SyncDeltaComputationService.swift */; };
+		CC0000000000000000000089 /* SyncFileTransferService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000089 /* SyncFileTransferService.swift */; };
+		CC000000000000000000008A /* SyncConflictResolutionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000008A /* SyncConflictResolutionService.swift */; };
+		CC000000000000000000008B /* SyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000008B /* SyncEngine.swift */; };
+		CC000000000000000000008C /* NetworkSyncViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000008C /* NetworkSyncViewModel.swift */; };
+		CC000000000000000000008D /* SyncStatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000008D /* SyncStatusBarController.swift */; };
+		CC000000000000000000008E /* SyncStatusPopoverViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000008E /* SyncStatusPopoverViewController.swift */; };
+		CC000000000000000000008F /* NetworkSyncSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000008F /* NetworkSyncSettingsViewController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -419,6 +435,22 @@
 		FF000000000000000000A002 /* TestURLFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestURLFactory.swift; sourceTree = "<group>"; };
 		FF000000000000000000A003 /* AsyncTestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncTestHelpers.swift; sourceTree = "<group>"; };
 		FF000000000000000000A004 /* MockPinnedItemsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockPinnedItemsService.swift; sourceTree = "<group>"; };
+		BB0000000000000000000080 /* NetworkSyncModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkSyncModels.swift; sourceTree = "<group>"; };
+		BB0000000000000000000081 /* NetworkSyncConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkSyncConfig.swift; sourceTree = "<group>"; };
+		BB0000000000000000000082 /* SyncMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncMessage.swift; sourceTree = "<group>"; };
+		BB0000000000000000000083 /* SyncMessageCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncMessageCodec.swift; sourceTree = "<group>"; };
+		BB0000000000000000000084 /* SyncDiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncDiscoveryService.swift; sourceTree = "<group>"; };
+		BB0000000000000000000085 /* SyncConnectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncConnectionService.swift; sourceTree = "<group>"; };
+		BB0000000000000000000086 /* FSEventsChangeDetectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FSEventsChangeDetectionService.swift; sourceTree = "<group>"; };
+		BB0000000000000000000087 /* SyncStateDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncStateDatabase.swift; sourceTree = "<group>"; };
+		BB0000000000000000000088 /* SyncDeltaComputationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncDeltaComputationService.swift; sourceTree = "<group>"; };
+		BB0000000000000000000089 /* SyncFileTransferService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncFileTransferService.swift; sourceTree = "<group>"; };
+		BB000000000000000000008A /* SyncConflictResolutionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncConflictResolutionService.swift; sourceTree = "<group>"; };
+		BB000000000000000000008B /* SyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngine.swift; sourceTree = "<group>"; };
+		BB000000000000000000008C /* NetworkSyncViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkSyncViewModel.swift; sourceTree = "<group>"; };
+		BB000000000000000000008D /* SyncStatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncStatusBarController.swift; sourceTree = "<group>"; };
+		BB000000000000000000008E /* SyncStatusPopoverViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncStatusPopoverViewController.swift; sourceTree = "<group>"; };
+		BB000000000000000000008F /* NetworkSyncSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkSyncSettingsViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -577,6 +609,7 @@
 				AA0000000000000000000023 /* FilterBar */,
 				AA0000000000000000000008 /* StatusBar */,
 				AA0000000000000000000031 /* Settings */,
+				AA0000000000000000000081 /* SyncStatusBar */,
 				AA0000000000000000000032 /* BatchRename */,
 				AA0000000000000000000033 /* Sync */,
 				AA0000000000000000000035 /* Effects */,
@@ -628,6 +661,7 @@
 				BB000000000000000000002C /* SidebarViewModel.swift */,
 				BB0000000000000000000038 /* BatchRenameViewModel.swift */,
 				BB0000000000000000000039 /* SyncViewModel.swift */,
+				BB000000000000000000008C /* NetworkSyncViewModel.swift */,
 				BB0000000000000000000040 /* BookmarkSearchViewModel.swift */,
 				BB000000000000000000004F /* TerminalSessionListViewModel.swift */,
 				BB0000000000000000000050 /* TerminalSessionViewModel.swift */,
@@ -650,6 +684,7 @@
 				BB0000000000000000000035 /* BatchRenameService.swift */,
 				BB0000000000000000000036 /* DirectoryComparisonService.swift */,
 				BB0000000000000000000037 /* SyncExecutionService.swift */,
+				AA0000000000000000000080 /* Sync */,
 				BB000000000000000000003E /* VisitHistoryService.swift */,
 				BB000000000000000000004A /* ApplicationRelatedItemLocatorService.swift */,
 				BB000000000000000000004E /* TerminalSessionService.swift */,
@@ -673,6 +708,7 @@
 				BB0000000000000000000030 /* BatchRenamePreset.swift */,
 				BB0000000000000000000031 /* BatchRenameResult.swift */,
 				BB0000000000000000000032 /* SyncModels.swift */,
+				BB0000000000000000000080 /* NetworkSyncModels.swift */,
 				BB000000000000000000003C /* VisitHistoryEntry.swift */,
 				BB000000000000000000004D /* TerminalSession.swift */,
 				BB0000000000000000000070 /* TreeExpansionState.swift */,
@@ -734,6 +770,7 @@
 				BB0000000000000000000018 /* KeybindingsConfig.swift */,
 				BB0000000000000000000033 /* BatchRenamePresetsConfig.swift */,
 				BB0000000000000000000034 /* SyncletsConfig.swift */,
+				BB0000000000000000000081 /* NetworkSyncConfig.swift */,
 				BB000000000000000000003D /* VisitHistoryConfig.swift */,
 				BB0000000000000000000072 /* PinnedItemsConfig.swift */,
 				BB0000000000000000000075 /* TerminalSessionsConfig.swift */,
@@ -999,6 +1036,32 @@
 			path = starfilerUITests;
 			sourceTree = "<group>";
 		};
+		AA0000000000000000000080 /* Sync */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000082 /* SyncMessage.swift */,
+				BB0000000000000000000083 /* SyncMessageCodec.swift */,
+				BB0000000000000000000084 /* SyncDiscoveryService.swift */,
+				BB0000000000000000000085 /* SyncConnectionService.swift */,
+				BB0000000000000000000086 /* FSEventsChangeDetectionService.swift */,
+				BB0000000000000000000087 /* SyncStateDatabase.swift */,
+				BB0000000000000000000088 /* SyncDeltaComputationService.swift */,
+				BB0000000000000000000089 /* SyncFileTransferService.swift */,
+				BB000000000000000000008A /* SyncConflictResolutionService.swift */,
+				BB000000000000000000008B /* SyncEngine.swift */,
+			);
+			path = Sync;
+			sourceTree = "<group>";
+		};
+		AA0000000000000000000081 /* SyncStatusBar */ = {
+			isa = PBXGroup;
+			children = (
+				BB000000000000000000008D /* SyncStatusBarController.swift */,
+				BB000000000000000000008E /* SyncStatusPopoverViewController.swift */,
+			);
+			path = SyncStatusBar;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -1259,6 +1322,22 @@
 				CC0000000000000000000077 /* TerminalSessionManagerViewController.swift in Sources */,
 				CC0000000000000000000078 /* LoggingLocalProcessTerminalView.swift in Sources */,
 				CC0000000000000000000079 /* TerminalSessionManagerWindowController.swift in Sources */,
+				CC0000000000000000000080 /* NetworkSyncModels.swift in Sources */,
+				CC0000000000000000000081 /* NetworkSyncConfig.swift in Sources */,
+				CC0000000000000000000082 /* SyncMessage.swift in Sources */,
+				CC0000000000000000000083 /* SyncMessageCodec.swift in Sources */,
+				CC0000000000000000000084 /* SyncDiscoveryService.swift in Sources */,
+				CC0000000000000000000085 /* SyncConnectionService.swift in Sources */,
+				CC0000000000000000000086 /* FSEventsChangeDetectionService.swift in Sources */,
+				CC0000000000000000000087 /* SyncStateDatabase.swift in Sources */,
+				CC0000000000000000000088 /* SyncDeltaComputationService.swift in Sources */,
+				CC0000000000000000000089 /* SyncFileTransferService.swift in Sources */,
+				CC000000000000000000008A /* SyncConflictResolutionService.swift in Sources */,
+				CC000000000000000000008B /* SyncEngine.swift in Sources */,
+				CC000000000000000000008C /* NetworkSyncViewModel.swift in Sources */,
+				CC000000000000000000008D /* SyncStatusBarController.swift in Sources */,
+				CC000000000000000000008E /* SyncStatusPopoverViewController.swift in Sources */,
+				CC000000000000000000008F /* NetworkSyncSettingsViewController.swift in Sources */,
 				95DC124F2E566D7FC0F5A7E2 /* TaskCenterEntry.swift in Sources */,
 				D2D7B2A18F78C9CD87D8BA4B /* TaskCenterViewModel.swift in Sources */,
 				F62B990D1CDE6CB6E6DB412B /* TaskCenterPopoverViewController.swift in Sources */,

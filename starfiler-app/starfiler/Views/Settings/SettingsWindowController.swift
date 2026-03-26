@@ -7,7 +7,8 @@ final class SettingsWindowController: NSWindowController {
         appearanceVC: AppearanceSettingsViewController,
         keybindingsVC: KeybindingsViewController,
         bookmarksVC: BookmarksSettingsViewController,
-        advancedVC: AdvancedSettingsViewController
+        advancedVC: AdvancedSettingsViewController,
+        networkSyncVC: NetworkSyncSettingsViewController? = nil
     ) {
         self.init(
             appearanceVC: appearanceVC,

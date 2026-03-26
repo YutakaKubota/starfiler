@@ -33,6 +33,7 @@ final class ConfigManager {
         static let visitHistoryConfig = "VisitHistory.json"
         static let pinnedItemsConfig = "PinnedItems.json"
         static let terminalSessionsConfig = "TerminalSessions.json"
+        static let networkSyncConfig = "NetworkSync.json"
     }
 
     let configDirectory: URL
@@ -205,6 +206,18 @@ final class ConfigManager {
         configDirectory.appendingPathComponent(FileName.terminalSessionsConfig, isDirectory: false)
     }
 
+    func loadNetworkSyncConfig() -> NetworkSyncConfig {
+        load(NetworkSyncConfig.self, from: networkSyncConfigURL) ?? NetworkSyncConfig()
+    }
+
+    func saveNetworkSyncConfig(_ config: NetworkSyncConfig) throws {
+        try save(config, to: networkSyncConfigURL)
+    }
+
+    var networkSyncConfigURL: URL {
+        configDirectory.appendingPathComponent(FileName.networkSyncConfig, isDirectory: false)
+    }
+
     // MARK: - Custom Config Directory
 
     private static let customConfigDirectoryKey = "customConfigDirectory"
@@ -369,6 +382,7 @@ final class ConfigManager {
             FileName.visitHistoryConfig,
             FileName.pinnedItemsConfig,
             FileName.terminalSessionsConfig,
+            FileName.networkSyncConfig,
         ]
     }
 
