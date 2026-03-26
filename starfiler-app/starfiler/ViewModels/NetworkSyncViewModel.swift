@@ -376,7 +376,9 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
     private func loadAvailableEntries() -> [NetworkSyncFileEntry] {
         switch mode {
         case .client:
-            let stateURL = configManager.configDirectory.appendingPathComponent("NetworkSyncClientState.json")
+            let stateURL = configManager
+                .networkSyncRuntimeDirectory(rootPath: config.effectiveRootPath)
+                .appendingPathComponent("client-state.json")
             guard let data = try? Data(contentsOf: stateURL),
                   let state = try? JSONDecoder().decode(NetworkSyncClientState.self, from: data)
             else {
@@ -389,8 +391,9 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
             guard !trimmedRootPath.isEmpty else {
                 return []
             }
-            let rootURL = URL(fileURLWithPath: UserPaths.expandHomeVariables(in: effectiveRootPath), isDirectory: true).standardizedFileURL
-            let stateURL = rootURL.appendingPathComponent(".starfiler-sync/state.json")
+            let stateURL = configManager
+                .networkSyncRuntimeDirectory(rootPath: effectiveRootPath)
+                .appendingPathComponent("server-state.json")
             guard let data = try? Data(contentsOf: stateURL),
                   let state = try? JSONDecoder().decode(NetworkSyncServerState.self, from: data)
             else {

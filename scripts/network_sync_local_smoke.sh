@@ -196,6 +196,13 @@ else
   exit 1
 fi
 
+if wait_for_absence "$SERVER_ROOT/.starfiler-sync" 2; then
+  append_report "PASS server root keeps sync metadata off-volume"
+else
+  append_report "FAIL server root still contains legacy .starfiler-sync metadata"
+  exit 1
+fi
+
 if wait_for_absence "$CLIENT_ROOT/private/hidden.txt" 5; then
   append_report "PASS excluded path stays local-absent before selection"
 else

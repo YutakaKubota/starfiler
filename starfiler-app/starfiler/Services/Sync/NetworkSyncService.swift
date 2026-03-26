@@ -1185,6 +1185,14 @@ final class NetworkSyncService: NetworkSyncControlling {
                 lhs.deleted == rhs.deleted
         }
 
+        if let lhsHash = lhs.contentHash, let rhsHash = rhs.contentHash {
+            return lhs.relativePath == rhs.relativePath &&
+                lhs.isDirectory == rhs.isDirectory &&
+                lhs.size == rhs.size &&
+                lhs.deleted == rhs.deleted &&
+                lhsHash == rhsHash
+        }
+
         return lhs.relativePath == rhs.relativePath &&
             lhs.isDirectory == rhs.isDirectory &&
             lhs.size == rhs.size &&
@@ -1235,18 +1243,19 @@ final class NetworkSyncService: NetworkSyncControlling {
     }
 
     private func conflictRelativePath(for relativePath: String, peerName: String) -> String {
-        let sourceURL = URL(fileURLWithPath: relativePath)
-        let stem = sourceURL.deletingPathExtension().lastPathComponent
-        let ext = sourceURL.pathExtension
+        let normalizedPath = normalizeRelativePath(relativePath)
+        let pathNSString = normalizedPath as NSString
+        let stem = (pathNSString.deletingPathExtension as NSString).lastPathComponent
+        let ext = pathNSString.pathExtension
         let timestamp = Self.conflictDateFormatter.string(from: Date())
         let fileName = ext.isEmpty
             ? "\(stem) (Conflict from \(peerName) \(timestamp))"
             : "\(stem) (Conflict from \(peerName) \(timestamp)).\(ext)"
-        let parent = sourceURL.deletingLastPathComponent().path
-        if parent == "/" || parent == "." {
+        let parent = pathNSString.deletingLastPathComponent
+        if parent.isEmpty || parent == "." {
             return fileName
         }
-        return URL(fileURLWithPath: parent, isDirectory: true).appendingPathComponent(fileName).path
+        return (parent as NSString).appendingPathComponent(fileName)
     }
 
     private func sendEnvelope(_ envelope: NetworkSyncEnvelope, over connection: NWConnection) throws {
@@ -1271,6 +1280,10 @@ final class NetworkSyncService: NetworkSyncControlling {
 
     private func loadServerState() throws {
         let stateURL = serverStateURL()
+        if !fileManager.fileExists(atPath: stateURL.path) {
+            try migrateLegacyServerStateIfNeeded(to: stateURL)
+        }
+
         if let data = try? Data(contentsOf: stateURL) {
             serverState = try decoder.decode(NetworkSyncServerState.self, from: data)
         } else {
@@ -1285,7 +1298,12 @@ final class NetworkSyncService: NetworkSyncControlling {
     }
 
     private func loadClientState() {
-        if let data = try? Data(contentsOf: clientStateURL()),
+        let stateURL = clientStateURL()
+        if !fileManager.fileExists(atPath: stateURL.path) {
+            migrateLegacyClientStateIfNeeded(to: stateURL)
+        }
+
+        if let data = try? Data(contentsOf: stateURL),
            let state = try? decoder.decode(NetworkSyncClientState.self, from: data) {
             clientState = state
         } else {
@@ -1294,19 +1312,51 @@ final class NetworkSyncService: NetworkSyncControlling {
     }
 
     private func saveClientState() {
-        try? encoder.encode(clientState).write(to: clientStateURL(), options: .atomic)
+        let stateURL = clientStateURL()
+        try? fileManager.createDirectory(at: stateURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? encoder.encode(clientState).write(to: stateURL, options: .atomic)
     }
 
     private func serverStateURL() -> URL {
-        rootURL!.appendingPathComponent(".starfiler-sync/state.json")
+        configManager
+            .networkSyncRuntimeDirectory(rootPath: rootURL!.path)
+            .appendingPathComponent("server-state.json")
     }
 
     private func clientStateURL() -> URL {
-        configManager.configDirectory.appendingPathComponent("NetworkSyncClientState.json")
+        configManager
+            .networkSyncRuntimeDirectory(rootPath: config.effectiveRootPath)
+            .appendingPathComponent("client-state.json")
     }
 
     private func temporaryDirectoryURL(under rootURL: URL) -> URL {
-        rootURL.appendingPathComponent(".starfiler-sync/tmp", isDirectory: true)
+        configManager
+            .networkSyncRuntimeDirectory(rootPath: rootURL.path)
+            .appendingPathComponent("tmp", isDirectory: true)
+    }
+
+    private func migrateLegacyServerStateIfNeeded(to destinationURL: URL) throws {
+        guard let rootURL else {
+            return
+        }
+
+        let legacyURL = rootURL.appendingPathComponent(".starfiler-sync/state.json")
+        guard fileManager.fileExists(atPath: legacyURL.path) else {
+            return
+        }
+
+        try fileManager.createDirectory(at: destinationURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fileManager.copyItem(at: legacyURL, to: destinationURL)
+    }
+
+    private func migrateLegacyClientStateIfNeeded(to destinationURL: URL) {
+        let legacyURL = configManager.configDirectory.appendingPathComponent("NetworkSyncClientState.json")
+        guard fileManager.fileExists(atPath: legacyURL.path) else {
+            return
+        }
+
+        try? fileManager.createDirectory(at: destinationURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? fileManager.copyItem(at: legacyURL, to: destinationURL)
     }
 
     private func nextServerRevision() -> Int {

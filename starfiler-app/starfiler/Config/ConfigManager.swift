@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 enum ConfigManagerError: LocalizedError {
@@ -141,6 +142,29 @@ final class ConfigManager {
         configDirectory.appendingPathComponent(FileName.networkSyncConfig, isDirectory: false)
     }
 
+    func networkSyncRuntimeDirectory(rootPath: String? = nil) -> URL {
+        let baseDirectory: URL
+        if Self.usesUITestSandboxRuntimeDirectory {
+            baseDirectory = configDirectory.appendingPathComponent(".network-sync-runtime", isDirectory: true)
+        } else {
+            baseDirectory = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+                ?? configDirectory.deletingLastPathComponent()
+        }
+        let bundleDirectory = baseDirectory
+            .appendingPathComponent(bundleIdentifier, isDirectory: true)
+            .appendingPathComponent("NetworkSyncRuntime", isDirectory: true)
+
+        let rootComponent: String
+        if let rootPath {
+            let expanded = UserPaths.expandHomeVariables(in: rootPath)
+            rootComponent = Self.stableDirectoryName(for: configDirectory.path + "|" + expanded)
+        } else {
+            rootComponent = Self.stableDirectoryName(for: configDirectory.path)
+        }
+
+        return bundleDirectory.appendingPathComponent(rootComponent, isDirectory: true)
+    }
+
     private func normalizedNetworkSyncConfig(_ config: NetworkSyncConfig) -> NetworkSyncConfig {
         var normalized = config
         if normalized.mode == .client {
@@ -188,6 +212,26 @@ final class ConfigManager {
     // MARK: - Custom Config Directory
 
     private static let customConfigDirectoryKey = "customConfigDirectory"
+    private static let usesUITestSandboxRuntimeDirectory = ProcessInfo.processInfo.arguments.contains("--sandbox-root")
+
+    private static func stableDirectoryName(for value: String) -> String {
+        let allowed = CharacterSet.alphanumerics
+        let prefix = value.unicodeScalars
+            .map { allowed.contains($0) ? Character($0) : "-" }
+            .reduce(into: "") { partialResult, character in
+                if partialResult.count < 24 {
+                    partialResult.append(character)
+                }
+            }
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+
+        let hash = SHA256.hash(data: Data(value.utf8))
+            .prefix(8)
+            .map { String(format: "%02x", $0) }
+            .joined()
+        let normalizedPrefix = prefix.isEmpty ? "runtime" : prefix
+        return "\(normalizedPrefix)-\(hash)"
+    }
 
     static func customConfigDirectoryURL() -> URL? {
         guard let path = UserDefaults.standard.string(forKey: customConfigDirectoryKey) else {
