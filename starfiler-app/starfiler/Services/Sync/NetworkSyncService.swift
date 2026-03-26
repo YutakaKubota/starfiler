@@ -81,14 +81,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         decoder.dateDecodingStrategy = .iso8601
         self.decoder = decoder
 
-        if let rawValue = UserDefaults.standard.string(forKey: Self.deviceIDDefaultsKey),
-           let existing = UUID(uuidString: rawValue) {
-            self.deviceID = existing
-        } else {
-            let created = UUID()
-            UserDefaults.standard.set(created.uuidString, forKey: Self.deviceIDDefaultsKey)
-            self.deviceID = created
-        }
+        self.deviceID = Self.resolveDeviceID(configDirectory: configManager.configDirectory)
     }
 
     func start() {
@@ -257,7 +250,7 @@ final class NetworkSyncService: NetworkSyncControlling {
 
     private func startServerListener() throws {
         let listener = try NWListener(using: .tcp)
-        listener.service = NWListener.Service(name: config.displayName, type: serviceType)
+        listener.service = NWListener.Service(name: config.advertisedServiceName, type: serviceType)
         listener.stateUpdateHandler = { [weak self] state in
             Task { @MainActor in
                 guard let self else { return }
@@ -305,7 +298,10 @@ final class NetworkSyncService: NetworkSyncControlling {
         for result in results {
             let endpoint = result.endpoint
             let id = endpoint.debugDescription
-            let name = endpoint.serviceName ?? endpoint.debugDescription
+            let advertisedName = endpoint.serviceName ?? endpoint.debugDescription
+            guard let name = visiblePeerName(from: advertisedName) else {
+                continue
+            }
             let state: NetworkSyncPeerState = (clientConnectionID == id && connections[id] != nil) ? .connected : .discovered
             nextPeers[id] = NetworkSyncPeerRuntime(
                 id: id,
@@ -320,10 +316,23 @@ final class NetworkSyncService: NetworkSyncControlling {
         peerRuntimes = nextPeers
         publishSnapshot()
 
-        guard clientConnectionID == nil, let result = results.first else {
+        let matchingResults = results.filter { result in
+            let advertisedName = result.endpoint.serviceName ?? result.endpoint.debugDescription
+            return visiblePeerName(from: advertisedName) != nil
+        }
+
+        guard clientConnectionID == nil, let result = matchingResults.first else {
             return
         }
         connectToServer(endpoint: result.endpoint)
+    }
+
+    private func visiblePeerName(from advertisedName: String) -> String? {
+        let prefix = "[\(config.effectiveDiscoveryScope)] "
+        guard advertisedName.hasPrefix(prefix) else {
+            return nil
+        }
+        return String(advertisedName.dropFirst(prefix.count))
     }
 
     private func connectToServer(endpoint: NWEndpoint) {
@@ -1449,12 +1458,40 @@ final class NetworkSyncService: NetworkSyncControlling {
         onSnapshot?(snapshot)
     }
 
-    private static let deviceIDDefaultsKey = "NetworkSyncService.deviceID"
+    private static let legacyDeviceIDDefaultsKey = "NetworkSyncService.deviceID"
+    private static let deviceIDFileName = "NetworkSyncDeviceID"
     private static let conflictDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
         return formatter
     }()
+
+    private static func resolveDeviceID(configDirectory: URL) -> UUID {
+        let fileURL = configDirectory.appendingPathComponent(deviceIDFileName, isDirectory: false)
+        if let data = try? Data(contentsOf: fileURL),
+           let rawValue = String(data: data, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           let existing = UUID(uuidString: rawValue) {
+            return existing
+        }
+
+        let shouldMigrateLegacyDefaults = configDirectory.standardizedFileURL == ConfigManager.defaultFallbackConfigDirectory().standardizedFileURL
+        if shouldMigrateLegacyDefaults,
+           let rawValue = UserDefaults.standard.string(forKey: legacyDeviceIDDefaultsKey),
+           let existing = UUID(uuidString: rawValue) {
+            persistDeviceID(existing, to: fileURL)
+            return existing
+        }
+
+        let created = UUID()
+        persistDeviceID(created, to: fileURL)
+        return created
+    }
+
+    private static func persistDeviceID(_ deviceID: UUID, to fileURL: URL) {
+        let data = Data(deviceID.uuidString.utf8)
+        try? data.write(to: fileURL, options: .atomic)
+    }
 }
 
 private extension NWEndpoint {

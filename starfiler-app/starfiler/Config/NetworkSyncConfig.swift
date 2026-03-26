@@ -151,6 +151,7 @@ struct NetworkSyncConfig: Codable, Sendable {
     var isEnabled: Bool
     var mode: SyncNodeMode
     var displayName: String
+    var discoveryScope: String
     var rootPath: String
     var includedPaths: [String]
     var conflictPolicy: NetworkSyncConflictPolicy
@@ -160,6 +161,15 @@ struct NetworkSyncConfig: Codable, Sendable {
 
     static var defaultClientRootPath: String {
         UserPaths.homeDirectoryPath + "/StarFilerSync"
+    }
+
+    var effectiveDiscoveryScope: String {
+        let trimmed = discoveryScope.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "default" : trimmed
+    }
+
+    var advertisedServiceName: String {
+        "[\(effectiveDiscoveryScope)] \(displayName)"
     }
 
     var effectiveRootPath: String {
@@ -177,6 +187,7 @@ struct NetworkSyncConfig: Codable, Sendable {
         isEnabled: Bool = false,
         mode: SyncNodeMode = .server,
         displayName: String = Host.current().localizedName ?? ProcessInfo.processInfo.hostName,
+        discoveryScope: String = "default",
         rootPath: String = "",
         includedPaths: [String] = [],
         conflictPolicy: NetworkSyncConflictPolicy = .keepBoth,
@@ -187,6 +198,7 @@ struct NetworkSyncConfig: Codable, Sendable {
         self.isEnabled = isEnabled
         self.mode = mode
         self.displayName = displayName
+        self.discoveryScope = discoveryScope
         let trimmedRootPath = rootPath.trimmingCharacters(in: .whitespacesAndNewlines)
         self.rootPath = trimmedRootPath.isEmpty && mode == .client ? Self.defaultClientRootPath : rootPath
         self.includedPaths = includedPaths
