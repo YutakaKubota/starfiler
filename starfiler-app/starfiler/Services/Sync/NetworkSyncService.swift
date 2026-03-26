@@ -223,8 +223,22 @@ final class NetworkSyncService: NetworkSyncControlling {
             case .client:
                 let latestSnapshot = try scanEntries(at: rootURL)
                 let changes = diff(old: localSnapshot, new: latestSnapshot)
+                let deletedPaths = Set(
+                    changes.compactMap { change -> String? in
+                        guard case .delete(let path) = change else { return nil }
+                        return shouldSyncPath(path, syncEntireRoot: config.syncEntireRoot, includedPaths: config.includedPaths) ? path : nil
+                    }
+                )
+                let upsertedPaths = Set(
+                    changes.compactMap { change -> String? in
+                        guard case .upsert(let entry) = change else { return nil }
+                        return entry.relativePath
+                    }
+                )
                 localSnapshot = latestSnapshot
                 clientState.materializedPaths = Set(latestSnapshot.keys)
+                clientState.pendingDeletionPaths.formUnion(deletedPaths)
+                clientState.pendingDeletionPaths.subtract(upsertedPaths)
                 saveClientState()
                 applyFinderBadges(for: localSnapshot.keys, status: .synced)
                 try pushClientChanges(changes)
@@ -491,9 +505,7 @@ final class NetworkSyncService: NetworkSyncControlling {
             publishSnapshot()
         case .stateRequest:
             guard config.mode == .server else { return }
-            let entries = serverState.entries.values
-                .sorted { $0.relativePath < $1.relativePath }
-            try sendEnvelope(.make(.stateSnapshot, payload: NetworkSyncStateSnapshotPayload(entries: entries), encoder: encoder), over: context.connection)
+            try sendStateSnapshot(over: context.connection)
         case .stateSnapshot:
             guard config.mode == .client else { return }
             let payload = try envelope.decode(NetworkSyncStateSnapshotPayload.self, decoder: decoder)
@@ -544,7 +556,9 @@ final class NetworkSyncService: NetworkSyncControlling {
     private func applyServerSnapshot(_ entries: [NetworkSyncFileEntry], over connection: NWConnection) throws {
         let remoteEntries = Dictionary(uniqueKeysWithValues: entries.map { ($0.relativePath, $0) })
         let currentLocal = try scanEntries(at: rootURL!)
-        let trackedKnownEntries = clientState.knownEntries.filter { clientState.materializedPaths.contains($0.key) }
+        let trackedKnownEntries = clientState.knownEntries.filter {
+            clientState.materializedPaths.contains($0.key) || hasPendingDeletion(for: $0.key, pendingDeletionPaths: clientState.pendingDeletionPaths)
+        }
         let localChanges = diffAgainstKnown(known: trackedKnownEntries, local: currentLocal)
 
         for change in localChanges {
@@ -578,13 +592,21 @@ final class NetworkSyncService: NetworkSyncControlling {
             guard shouldSyncPath(entry.relativePath, syncEntireRoot: config.syncEntireRoot, includedPaths: config.includedPaths) else {
                 clientState.knownEntries[entry.relativePath] = entry
                 clientState.materializedPaths.remove(entry.relativePath)
+                clearPendingDeletion(for: entry.relativePath)
+                continue
+            }
+
+            if metadataEquivalent(currentLocal[entry.relativePath], entry) {
+                clientState.knownEntries[entry.relativePath] = entry
+                clearPendingDeletion(for: entry.relativePath)
                 continue
             }
 
             if hasUnsyncedLocalChange(
                 path: entry.relativePath,
                 currentLocal: currentLocal,
-                materializedPaths: clientState.materializedPaths
+                materializedPaths: clientState.materializedPaths,
+                pendingDeletionPaths: clientState.pendingDeletionPaths
             ) {
                 continue
             }
@@ -602,6 +624,7 @@ final class NetworkSyncService: NetworkSyncControlling {
                 try sendEnvelope(.make(.fileRequest, payload: NetworkSyncFileRequestPayload(relativePath: entry.relativePath), encoder: encoder), over: connection)
             } else {
                 clientState.knownEntries[entry.relativePath] = entry
+                clearPendingDeletion(for: entry.relativePath)
             }
         }
 
@@ -615,6 +638,7 @@ final class NetworkSyncService: NetworkSyncControlling {
                 revision: knownEntry.revision + 1,
                 deleted: true
             )
+            clearPendingDeletion(for: path)
         }
 
         localSnapshot = try scanEntries(at: rootURL!)
@@ -632,7 +656,8 @@ final class NetworkSyncService: NetworkSyncControlling {
         if hasUnsyncedLocalChange(
             path: relativePath,
             currentLocal: currentLocal,
-            materializedPaths: clientState.materializedPaths
+            materializedPaths: clientState.materializedPaths,
+            pendingDeletionPaths: clientState.pendingDeletionPaths
         ) {
             try createLocalConflictCopy(for: relativePath, currentLocal: currentLocal)
         }
@@ -651,6 +676,7 @@ final class NetworkSyncService: NetworkSyncControlling {
             deleted: false
         )
         clientState.knownEntries[relativePath] = entry
+        clearPendingDeletion(for: relativePath)
         localSnapshot = try scanEntries(at: rootURL)
         clientState.materializedPaths = Set(localSnapshot.keys)
         saveClientState()
@@ -665,7 +691,8 @@ final class NetworkSyncService: NetworkSyncControlling {
         if hasUnsyncedLocalChange(
             path: payload.relativePath,
             currentLocal: currentLocal,
-            materializedPaths: clientState.materializedPaths
+            materializedPaths: clientState.materializedPaths,
+            pendingDeletionPaths: clientState.pendingDeletionPaths
         ) {
             try createLocalConflictCopy(for: payload.relativePath, currentLocal: currentLocal)
         }
@@ -688,6 +715,7 @@ final class NetworkSyncService: NetworkSyncControlling {
             deleted: true
         )
         clientState.knownEntries[payload.relativePath] = tombstone
+        clearPendingDeletion(for: payload.relativePath)
         localSnapshot = try scanEntries(at: rootURL)
         clientState.materializedPaths = Set(localSnapshot.keys)
         saveClientState()
@@ -774,6 +802,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         try saveServerState()
         localSnapshot = try scanEntries(at: rootURL)
         appendTransfer(relativePath: entry.relativePath, direction: .upload, status: "Accepted", progress: 1, detail: "Uploaded to server")
+        try sendStateSnapshot(over: context.connection)
         try broadcast(entry: entry, excluding: incoming.start.originDeviceID)
     }
 
@@ -807,6 +836,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         serverState.entries[payload.relativePath] = tombstone
         try saveServerState()
         localSnapshot = try scanEntries(at: rootURL)
+        try sendStateSnapshot(over: context.connection)
         try broadcastDelete(tombstone, excluding: payload.originDeviceID)
     }
 
@@ -1110,7 +1140,8 @@ final class NetworkSyncService: NetworkSyncControlling {
     private func hasUnsyncedLocalChange(
         path: String,
         currentLocal: [String: NetworkSyncFileEntry],
-        materializedPaths: Set<String>
+        materializedPaths: Set<String>,
+        pendingDeletionPaths: Set<String>
     ) -> Bool {
         let knownEntry = clientState.knownEntries[path]
         let localEntry = currentLocal[path]
@@ -1120,12 +1151,27 @@ final class NetworkSyncService: NetworkSyncControlling {
         case (nil, let localEntry?):
             return !localEntry.deleted
         case (let knownEntry?, nil):
+            if hasPendingDeletion(for: path, pendingDeletionPaths: pendingDeletionPaths) {
+                return true
+            }
             guard materializedPaths.contains(path) else {
                 return false
             }
             return !knownEntry.deleted
         case (nil, nil):
             return false
+        }
+    }
+
+    private func hasPendingDeletion(for path: String, pendingDeletionPaths: Set<String>) -> Bool {
+        pendingDeletionPaths.contains { pendingPath in
+            path == pendingPath || path.hasPrefix(pendingPath + "/")
+        }
+    }
+
+    private func clearPendingDeletion(for path: String) {
+        clientState.pendingDeletionPaths = clientState.pendingDeletionPaths.filter { pendingPath in
+            pendingPath != path && !pendingPath.hasPrefix(path + "/")
         }
     }
 
@@ -1216,6 +1262,11 @@ final class NetworkSyncService: NetworkSyncControlling {
                 }
             }
         })
+    }
+
+    private func sendStateSnapshot(over connection: NWConnection) throws {
+        let entries = serverState.entries.values.sorted { $0.relativePath < $1.relativePath }
+        try sendEnvelope(.make(.stateSnapshot, payload: NetworkSyncStateSnapshotPayload(entries: entries), encoder: encoder), over: connection)
     }
 
     private func loadServerState() throws {

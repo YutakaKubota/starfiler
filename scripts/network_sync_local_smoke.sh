@@ -228,6 +228,21 @@ else
   exit 1
 fi
 
+mkdir -p "$CLIENT_ROOT/docs/delete-me"
+print "delete me" > "$CLIENT_ROOT/docs/delete-me/local.txt"
+if ! wait_for_path "$SERVER_ROOT/docs/delete-me/local.txt" 25; then
+  append_report "FAIL delete regression setup upload"
+  exit 1
+fi
+
+rm -rf "$CLIENT_ROOT/docs/delete-me"
+if wait_for_absence "$SERVER_ROOT/docs/delete-me" 25 && wait_for_absence "$CLIENT_ROOT/docs/delete-me" 8; then
+  append_report "PASS selected client deletion syncs and does not resurrect"
+else
+  append_report "FAIL selected client deletion resurrected or did not reach server"
+  exit 1
+fi
+
 if find "$SERVER_ROOT" -name '*Conflict from*' -print -quit | grep -q .; then
   append_report "FAIL directory conflict regression produced conflict copies"
   exit 1
