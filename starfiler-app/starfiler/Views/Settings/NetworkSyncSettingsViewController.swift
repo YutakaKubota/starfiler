@@ -38,6 +38,8 @@ final class NetworkSyncSettingsViewController: NSViewController {
     private let selectiveSyncScrollView = NSScrollView()
     private var selectiveSyncObserverToken: UUID?
     private var suppressViewModelRefresh = false
+    private var lastRenderedSelectiveSyncNodes: [SelectiveSyncBrowserNode] = []
+    private var hasPerformedInitialSelectiveSyncExpansion = false
 
     init(viewModel: NetworkSyncViewModel? = nil) {
         self.viewModel = viewModel ?? NetworkSyncViewModel()
@@ -361,9 +363,28 @@ final class NetworkSyncSettingsViewController: NSViewController {
         peersTextView.string = peerSummaryText()
         statusLabel.stringValue = viewModel.statusMessage
 
-        selectiveSyncOutlineView.reloadData()
-        expandSelectiveSyncTree()
+        refreshSelectiveSyncOutlineIfNeeded()
         refreshSelectiveSyncControls()
+    }
+
+    private func refreshSelectiveSyncOutlineIfNeeded() {
+        let nextNodes = viewModel.selectiveSyncNodes
+        let nodesChanged = nextNodes != lastRenderedSelectiveSyncNodes
+        guard nodesChanged else {
+            return
+        }
+
+        let expandedPaths = currentExpandedPaths(in: lastRenderedSelectiveSyncNodes)
+        selectiveSyncOutlineView.reloadData()
+
+        if !hasPerformedInitialSelectiveSyncExpansion {
+            expandSelectiveSyncTree()
+            hasPerformedInitialSelectiveSyncExpansion = true
+        } else {
+            restoreExpandedPaths(expandedPaths, in: nextNodes)
+        }
+
+        lastRenderedSelectiveSyncNodes = nextNodes
     }
 
     private func refreshSelectiveSyncControls() {
@@ -381,6 +402,35 @@ final class NetworkSyncSettingsViewController: NSViewController {
         for node in viewModel.selectiveSyncNodes {
             expandRecursively(node)
         }
+    }
+
+    private func currentExpandedPaths(in roots: [SelectiveSyncBrowserNode]) -> Set<String> {
+        var paths: Set<String> = []
+
+        func collect(from nodes: [SelectiveSyncBrowserNode]) {
+            for node in nodes where node.isDirectory {
+                if selectiveSyncOutlineView.isItemExpanded(node) {
+                    paths.insert(node.path)
+                }
+                collect(from: node.children)
+            }
+        }
+
+        collect(from: roots)
+        return paths
+    }
+
+    private func restoreExpandedPaths(_ paths: Set<String>, in roots: [SelectiveSyncBrowserNode]) {
+        func restore(from nodes: [SelectiveSyncBrowserNode]) {
+            for node in nodes where node.isDirectory {
+                if paths.contains(node.path) {
+                    selectiveSyncOutlineView.expandItem(node, expandChildren: false)
+                }
+                restore(from: node.children)
+            }
+        }
+
+        restore(from: roots)
     }
 
     private func expandRecursively(_ node: SelectiveSyncBrowserNode) {
@@ -450,6 +500,7 @@ final class NetworkSyncSettingsViewController: NSViewController {
     @objc
     private func expandAllSelectiveSyncItems(_ sender: NSButton) {
         expandSelectiveSyncTree()
+        hasPerformedInitialSelectiveSyncExpansion = true
     }
 
     @objc
@@ -457,6 +508,7 @@ final class NetworkSyncSettingsViewController: NSViewController {
         for node in viewModel.selectiveSyncNodes {
             collapseRecursively(node)
         }
+        hasPerformedInitialSelectiveSyncExpansion = true
     }
 
     @objc
