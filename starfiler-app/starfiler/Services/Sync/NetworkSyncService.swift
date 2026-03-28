@@ -138,7 +138,7 @@ final class NetworkSyncService: NetworkSyncControlling {
                     self.saveClientState()
                     self.startPathMonitor(for: rootURL)
                     self.startHeartbeat()
-                    self.applyFinderBadges(for: self.localSnapshot.keys, status: .synced)
+                    self.refreshClientFinderBadges()
                     self.startClientBrowser()
                     self.updateStatus(.offline, detail: "Searching for a Starfiler sync server…")
                 }
@@ -193,7 +193,7 @@ final class NetworkSyncService: NetworkSyncControlling {
             do {
                 localSnapshot = try scanEntries(at: rootURL)
                 if config.role == .client {
-                    applyFinderBadges(for: localSnapshot.keys, status: .synced)
+                    refreshClientFinderBadges()
                 }
             } catch {
                 setError(error.localizedDescription)
@@ -243,7 +243,7 @@ final class NetworkSyncService: NetworkSyncControlling {
                 clientState.pendingDeletionPaths.formUnion(deletedPaths)
                 clientState.pendingDeletionPaths.subtract(upsertedPaths)
                 saveClientState()
-                applyFinderBadges(for: localSnapshot.keys, status: .synced)
+                refreshClientFinderBadges()
                 try pushClientChanges(changes)
             }
         } catch {
@@ -647,7 +647,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         localSnapshot = try scanEntries(at: rootURL!)
         clientState.materializedPaths = Set(localSnapshot.keys)
         saveClientState()
-        applyFinderBadges(for: localSnapshot.keys, status: .synced)
+        refreshClientFinderBadges()
         updateStatus(.idle, detail: "Connected to \(peerRuntimes.values.first?.name ?? "server").")
     }
 
@@ -683,7 +683,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         localSnapshot = try scanEntries(at: rootURL)
         clientState.materializedPaths = Set(localSnapshot.keys)
         saveClientState()
-        applyFinderBadges(for: [relativePath], status: .synced)
+        refreshClientFinderBadges()
         appendTransfer(relativePath: relativePath, direction: .download, status: "Completed", progress: 1, detail: "Downloaded from server")
     }
 
@@ -1469,7 +1469,77 @@ final class NetworkSyncService: NetworkSyncControlling {
     private enum FinderBadgeStatus {
         case synced
         case syncing
+        case pending
         case attention
+    }
+
+    private func refreshClientFinderBadges() {
+        guard config.role == .client else {
+            return
+        }
+
+        var pendingPaths: Set<String> = []
+        var syncingPaths: Set<String> = []
+        var conflictPaths: Set<String> = []
+
+        for (path, localEntry) in localSnapshot where isUnsyncedClientEntry(path: path, localEntry: localEntry) {
+            markPathAndAncestors(path, into: &pendingPaths)
+        }
+
+        for path in activeTransfersByPath.keys {
+            markPathAndAncestors(path, into: &syncingPaths)
+        }
+
+        for conflict in conflicts {
+            markPathAndAncestors(conflict.relativePath, into: &conflictPaths)
+        }
+
+        for path in localSnapshot.keys.sorted() {
+            let status: FinderBadgeStatus
+            if conflictPaths.contains(path) {
+                status = .attention
+            } else if syncingPaths.contains(path) {
+                status = .syncing
+            } else if pendingPaths.contains(path) {
+                status = .pending
+            } else {
+                status = .synced
+            }
+            applyFinderBadges(for: [path], status: status)
+        }
+    }
+
+    private func isUnsyncedClientEntry(path: String, localEntry: NetworkSyncFileEntry) -> Bool {
+        guard config.role == .client else {
+            return false
+        }
+
+        if hasPendingDeletion(for: path, pendingDeletionPaths: clientState.pendingDeletionPaths) {
+            return true
+        }
+
+        guard let knownEntry = clientState.knownEntries[path] else {
+            return true
+        }
+
+        return !metadataEquivalent(knownEntry, localEntry)
+    }
+
+    private func markPathAndAncestors(_ relativePath: String, into set: inout Set<String>) {
+        let normalizedPath = normalizeRelativePath(relativePath)
+        guard !normalizedPath.isEmpty else {
+            return
+        }
+
+        var path = normalizedPath
+        while !path.isEmpty {
+            set.insert(path)
+            let parent = (path as NSString).deletingLastPathComponent
+            if parent.isEmpty || parent == "." || parent == path {
+                break
+            }
+            path = parent
+        }
     }
 
     private func applyFinderBadges(for relativePaths: some Sequence<String>, status: FinderBadgeStatus) {
@@ -1522,6 +1592,9 @@ final class NetworkSyncService: NetworkSyncControlling {
         case .syncing:
             symbolName = "arrow.triangle.2.circlepath.circle.fill"
             tint = .systemBlue
+        case .pending:
+            symbolName = "clock.fill"
+            tint = .systemYellow
         case .attention:
             symbolName = "exclamationmark.triangle.fill"
             tint = .systemOrange
@@ -1546,7 +1619,7 @@ final class NetworkSyncService: NetworkSyncControlling {
             height: badgeSide
         )
         let circlePath = NSBezierPath(ovalIn: badgeRect)
-        NSColor.windowBackgroundColor.withAlphaComponent(0.92).setFill()
+        tint.setFill()
         circlePath.fill()
 
         let configuredSymbol = symbol.withSymbolConfiguration(
@@ -1555,7 +1628,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         let tinted = configuredSymbol.copy() as? NSImage ?? configuredSymbol
         tinted.isTemplate = true
         tinted.size = NSSize(width: badgeSide * 0.78, height: badgeSide * 0.78)
-        tint.set()
+        NSColor.white.set()
         let symbolOrigin = NSPoint(
             x: badgeRect.midX - (tinted.size.width / 2),
             y: badgeRect.midY - (tinted.size.height / 2)
