@@ -37,6 +37,7 @@ final class NetworkSyncSettingsViewController: NSViewController {
     private let selectiveSyncOutlineView = NSOutlineView()
     private let selectiveSyncScrollView = NSScrollView()
     private var selectiveSyncObserverToken: UUID?
+    private var suppressViewModelRefresh = false
 
     init(viewModel: NetworkSyncViewModel? = nil) {
         self.viewModel = viewModel ?? NetworkSyncViewModel()
@@ -335,7 +336,10 @@ final class NetworkSyncSettingsViewController: NSViewController {
 
     private func bindViewModel() {
         selectiveSyncObserverToken = viewModel.addDidChangeObserver { [weak self] in
-            self?.refreshFromViewModel()
+            guard let self, !self.suppressViewModelRefresh else {
+                return
+            }
+            self.refreshFromViewModel()
         }
     }
 
@@ -402,7 +406,6 @@ final class NetworkSyncSettingsViewController: NSViewController {
             return
         }
         serverRootPathField.stringValue = selectedURL.path
-        viewModel.serverRootPath = selectedURL.path
     }
 
     @objc
@@ -411,9 +414,12 @@ final class NetworkSyncSettingsViewController: NSViewController {
             return
         }
         clientRootPathField.stringValue = selectedURL.path
-        viewModel.clientRootPath = selectedURL.path
-        viewModel.applyClientDefaultsIfNeeded()
-        viewModel.refreshSelectiveSyncPreview()
+        withSuppressedViewModelRefresh {
+            viewModel.clientRootPath = selectedURL.path
+            viewModel.applyClientDefaultsIfNeeded()
+            viewModel.refreshSelectiveSyncPreview()
+        }
+        refreshFromViewModel()
     }
 
     @objc
@@ -423,9 +429,12 @@ final class NetworkSyncSettingsViewController: NSViewController {
 
     @objc
     private func refreshSelectiveSyncTree(_ sender: NSButton) {
-        viewModel.clientRootPath = clientRootPathField.stringValue
-        viewModel.refreshSelectiveSyncPreview()
-        viewModel.requestRefresh()
+        withSuppressedViewModelRefresh {
+            viewModel.clientRootPath = clientRootPathField.stringValue
+            viewModel.refreshSelectiveSyncPreview()
+            viewModel.requestRefresh()
+        }
+        refreshFromViewModel()
     }
 
     @objc
@@ -452,21 +461,30 @@ final class NetworkSyncSettingsViewController: NSViewController {
 
     @objc
     private func saveChanges(_ sender: NSButton) {
-        viewModel.displayName = displayNameField.stringValue
-        viewModel.serverRootPath = serverRootPathField.stringValue
-        viewModel.clientRootPath = clientRootPathField.stringValue
-        if let rawValue = conflictPolicyPopup.selectedItem?.representedObject as? String,
-           let policy = NetworkSyncConflictPolicy(rawValue: rawValue) {
-            viewModel.conflictPolicy = policy
+        withSuppressedViewModelRefresh {
+            viewModel.displayName = displayNameField.stringValue
+            viewModel.serverRootPath = serverRootPathField.stringValue
+            viewModel.clientRootPath = clientRootPathField.stringValue
+            if let rawValue = conflictPolicyPopup.selectedItem?.representedObject as? String,
+               let policy = NetworkSyncConflictPolicy(rawValue: rawValue) {
+                viewModel.conflictPolicy = policy
+            }
+            viewModel.heartbeatIntervalSeconds = heartbeatField.doubleValue
+            viewModel.syncDebounceSeconds = debounceField.doubleValue
+            viewModel.save()
         }
-        viewModel.heartbeatIntervalSeconds = heartbeatField.doubleValue
-        viewModel.syncDebounceSeconds = debounceField.doubleValue
-        viewModel.save()
+        refreshFromViewModel()
     }
 
     @objc
     private func reloadFromDisk(_ sender: NSButton) {
         viewModel.reload()
+    }
+
+    private func withSuppressedViewModelRefresh(_ updates: () -> Void) {
+        suppressViewModelRefresh = true
+        updates()
+        suppressViewModelRefresh = false
     }
 
     @objc

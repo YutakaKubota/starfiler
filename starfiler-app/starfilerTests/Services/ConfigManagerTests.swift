@@ -324,6 +324,30 @@ final class ConfigManagerTests: XCTestCase {
         XCTAssertEqual(loaded.discoveryScope, "local-smoke")
     }
 
+    func testSaveAndLoadNetworkSyncConfigKeepsServerAndClientRootsSeparate() throws {
+        let config = NetworkSyncConfig(
+            displayName: "Dual Role",
+            discoveryScope: "dual-role",
+            serverEnabled: true,
+            serverRootPath: "/Volumes/HD-ADU3/StarFilerSync",
+            clientEnabled: true,
+            clientRootPath: "/Users/harry/StarFilerSync",
+            clientSyncEntireRoot: true,
+            clientIncludedPaths: [],
+            conflictPolicy: .keepBoth,
+            heartbeatIntervalSeconds: 10,
+            syncDebounceSeconds: 0.5,
+            peers: []
+        )
+
+        try sut.saveNetworkSyncConfig(config)
+        let loaded = sut.loadNetworkSyncConfig()
+
+        XCTAssertEqual(loaded.serverEffectiveRootPath, "/Volumes/HD-ADU3/StarFilerSync")
+        XCTAssertEqual(loaded.clientEffectiveRootPath, "/Users/harry/StarFilerSync")
+        XCTAssertNotEqual(loaded.serverEffectiveRootPath, loaded.clientEffectiveRootPath)
+    }
+
     // MARK: - Config Directory
 
     func testConfigDirectoryIsCreated() {
