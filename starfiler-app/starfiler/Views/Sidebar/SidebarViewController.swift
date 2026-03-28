@@ -39,7 +39,11 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource, NS
 
     private let sectionHeaderHeight: CGFloat = 22
     private let entryRowHeight: CGFloat = 24
-    private let windowControlsHeight: CGFloat = 22
+    private let windowControlsTopInset: CGFloat = 6
+    private let windowControlsBottomInset: CGFloat = 4
+    private let windowControlsLeadingInset: CGFloat = 14
+    private let windowControlsSpacing: CGFloat = 8
+    private let fallbackWindowControlButtonSize = NSSize(width: 14, height: 14)
     private let maxRecentHeightRatio: CGFloat = 0.45
     private let maxRecentVisibleRows: CGFloat = 12
     private var lastKnownSidebarHeight: CGFloat = 0
@@ -92,20 +96,29 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource, NS
         }
 
         loadViewIfNeeded()
-        windowControlsHeightConstraint.constant = windowControlsHeight
 
         for existing in windowControlsStackView.arrangedSubviews {
             windowControlsStackView.removeArrangedSubview(existing)
             existing.removeFromSuperview()
         }
 
+        var maximumButtonHeight: CGFloat = 0
+
         for button in buttons {
             button.removeFromSuperview()
             button.translatesAutoresizingMaskIntoConstraints = false
             button.setContentHuggingPriority(.required, for: .horizontal)
             button.setContentCompressionResistancePriority(.required, for: .horizontal)
+            let buttonSize = resolvedWindowControlButtonSize(for: button)
+            maximumButtonHeight = max(maximumButtonHeight, buttonSize.height)
+            NSLayoutConstraint.activate([
+                button.widthAnchor.constraint(equalToConstant: buttonSize.width),
+                button.heightAnchor.constraint(equalToConstant: buttonSize.height)
+            ])
             windowControlsStackView.addArrangedSubview(button)
         }
+
+        windowControlsHeightConstraint.constant = maximumButtonHeight + windowControlsTopInset + windowControlsBottomInset
     }
 
     func applyTheme(_ theme: FilerTheme, backgroundOpacity: CGFloat = 1.0) {
@@ -205,7 +218,7 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource, NS
         windowControlsStackView.translatesAutoresizingMaskIntoConstraints = false
         windowControlsStackView.orientation = .horizontal
         windowControlsStackView.alignment = .centerY
-        windowControlsStackView.spacing = 8
+        windowControlsStackView.spacing = windowControlsSpacing
 
         windowControlsContainer.addSubview(windowControlsStackView)
         view.addSubview(scrollView)
@@ -242,9 +255,10 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource, NS
             windowControlsContainer.topAnchor.constraint(equalTo: view.topAnchor),
             windowControlsHeightConstraint,
 
-            windowControlsStackView.leadingAnchor.constraint(equalTo: windowControlsContainer.leadingAnchor, constant: 14),
-            windowControlsStackView.topAnchor.constraint(equalTo: windowControlsContainer.topAnchor, constant: 6),
-            windowControlsStackView.bottomAnchor.constraint(lessThanOrEqualTo: windowControlsContainer.bottomAnchor, constant: -2),
+            windowControlsStackView.leadingAnchor.constraint(equalTo: windowControlsContainer.leadingAnchor, constant: windowControlsLeadingInset),
+            windowControlsStackView.centerYAnchor.constraint(equalTo: windowControlsContainer.centerYAnchor),
+            windowControlsStackView.topAnchor.constraint(greaterThanOrEqualTo: windowControlsContainer.topAnchor, constant: windowControlsTopInset),
+            windowControlsStackView.bottomAnchor.constraint(lessThanOrEqualTo: windowControlsContainer.bottomAnchor, constant: -windowControlsBottomInset),
 
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -268,6 +282,20 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource, NS
             NSLayoutConstraint.deactivate(recentConstraints)
             scrollViewBottomToView.isActive = true
         }
+    }
+
+    private func resolvedWindowControlButtonSize(for button: NSButton) -> NSSize {
+        let fittingSize = button.fittingSize
+        if fittingSize.width > 0, fittingSize.height > 0 {
+            return fittingSize
+        }
+
+        let frameSize = button.frame.size
+        if frameSize.width > 0, frameSize.height > 0 {
+            return frameSize
+        }
+
+        return fallbackWindowControlButtonSize
     }
 
     private func bindViewModel() {
