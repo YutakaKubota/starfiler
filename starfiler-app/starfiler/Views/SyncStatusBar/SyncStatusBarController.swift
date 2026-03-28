@@ -82,6 +82,7 @@ final class SyncStatusBarController: NSObject {
     private let viewModel: any SyncStatusBarPresenting
     private weak var popoverViewController: SyncStatusPopoverViewController?
     private var changeObserverToken: UUID?
+    private var pendingPopoverReloadTask: Task<Void, Never>?
 
     init(viewModel: any SyncStatusBarPresenting) {
         self.viewModel = viewModel
@@ -104,7 +105,7 @@ final class SyncStatusBarController: NSObject {
     func refresh() {
         viewModel.requestRefresh()
         refreshStatus()
-        popoverViewController?.reload(using: viewModel)
+        schedulePopoverReload()
     }
 
     func showPopover() {
@@ -156,7 +157,29 @@ final class SyncStatusBarController: NSObject {
     private func bindViewModel() {
         changeObserverToken = viewModel.addDidChangeObserver { [weak self] in
             self?.refreshStatus()
-            self?.popoverViewController?.reload(using: self?.viewModel)
+            self?.schedulePopoverReload()
+        }
+    }
+
+    private func schedulePopoverReload() {
+        guard popover.isShown else {
+            pendingPopoverReloadTask?.cancel()
+            pendingPopoverReloadTask = nil
+            return
+        }
+
+        pendingPopoverReloadTask?.cancel()
+        pendingPopoverReloadTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled else {
+                return
+            }
+            await MainActor.run {
+                guard let self, self.popover.isShown else {
+                    return
+                }
+                self.popoverViewController?.reload(using: self.viewModel)
+            }
         }
     }
 
@@ -193,6 +216,8 @@ final class SyncStatusBarController: NSObject {
 
 extension SyncStatusBarController: NSPopoverDelegate {
     func popoverDidClose(_ notification: Notification) {
+        pendingPopoverReloadTask?.cancel()
+        pendingPopoverReloadTask = nil
         refreshStatus()
     }
 }

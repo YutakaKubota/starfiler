@@ -1,6 +1,68 @@
 import Foundation
 import Observation
 
+private actor SelectiveSyncBrowserDataLoader {
+    struct Snapshot: Sendable {
+        let entries: [NetworkSyncFileEntry]
+        let localAvailability: Set<String>
+    }
+
+    func load(stateURL: URL, effectiveRootPath: String) -> Snapshot {
+        let entries = loadAvailableEntries(from: stateURL)
+        let localAvailability = loadLocalAvailability(rootPath: effectiveRootPath)
+        return Snapshot(entries: entries, localAvailability: localAvailability)
+    }
+
+    private func loadAvailableEntries(from stateURL: URL) -> [NetworkSyncFileEntry] {
+        guard let data = try? Data(contentsOf: stateURL),
+              let state = try? JSONDecoder().decode(NetworkSyncClientState.self, from: data)
+        else {
+            return []
+        }
+        return state.knownEntries.values.filter { !$0.deleted }
+    }
+
+    private func loadLocalAvailability(rootPath: String) -> Set<String> {
+        let trimmedRootPath = rootPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedRootPath.isEmpty else {
+            return []
+        }
+
+        let fileManager = FileManager.default
+        let rootURL = URL(fileURLWithPath: UserPaths.expandHomeVariables(in: trimmedRootPath), isDirectory: true).standardizedFileURL
+        var localPaths: Set<String> = []
+
+        guard let enumerator = fileManager.enumerator(
+            at: rootURL,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return localPaths
+        }
+
+        for case let fileURL as URL in enumerator {
+            let relative = Self.normalizeRelativePath(fileURL.path.replacingOccurrences(of: rootURL.path, with: ""))
+            guard !relative.isEmpty else {
+                continue
+            }
+            localPaths.insert(relative)
+        }
+
+        return localPaths
+    }
+
+    private static func normalizeRelativePath(_ value: String) -> String {
+        value.trimmingCharacters(in: CharacterSet(charactersIn: "/").union(.whitespacesAndNewlines))
+    }
+}
+
+private struct SelectiveSyncSnapshotFingerprint: Equatable {
+    let conflictIDs: [String]
+    let transferIDs: [String]
+
+    static let empty = SelectiveSyncSnapshotFingerprint(conflictIDs: [], transferIDs: [])
+}
+
 enum SelectiveSyncSelectionState: Sendable {
     case off
     case on
@@ -61,12 +123,17 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
 
     private let configManager: ConfigManager
     private let peerSummaryDateFormatter: DateFormatter
-    private let fileManager: FileManager
     private let service: any NetworkSyncControlling
     private var config: NetworkSyncConfig
     private var activeTransfers: [String: NetworkSyncTransferActivity] = [:]
     private let byteCountFormatter: ByteCountFormatter
     private var changeObservers: [UUID: @MainActor () -> Void] = [:]
+    private let selectiveSyncDataLoader = SelectiveSyncBrowserDataLoader()
+    private var cachedAvailableEntries: [NetworkSyncFileEntry] = []
+    private var cachedLocalAvailability: Set<String> = []
+    private var selectiveSyncRefreshTask: Task<Void, Never>?
+    private var selectiveSyncRefreshGeneration = 0
+    private var lastSelectiveSyncRefreshFingerprint = SelectiveSyncSnapshotFingerprint.empty
 
     var isEnabled: Bool {
         serverEnabled || clientEnabled
@@ -79,7 +146,6 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         service: (any NetworkSyncControlling)? = nil
     ) {
         self.configManager = configManager
-        self.fileManager = fileManager
         self.peerSummaryDateFormatter = DateFormatter()
         peerSummaryDateFormatter.dateStyle = .short
         peerSummaryDateFormatter.timeStyle = .short
@@ -107,7 +173,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         )
 
         refreshPeerSummaries()
-        refreshSelectiveSyncBrowser()
+        refreshSelectiveSyncBrowser(needsDiskRefresh: true)
         bindService()
         if loadedConfig.isEnabled {
             self.service.start()
@@ -128,7 +194,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         syncDebounceSeconds = config.syncDebounceSeconds
         clientSyncEntireRoot = config.clientSyncEntireRoot
         refreshPeerSummaries()
-        refreshSelectiveSyncBrowser()
+        refreshSelectiveSyncBrowser(needsDiskRefresh: true, notifyOnChange: true)
         statusMessage = "Reloaded from disk"
         if config.isEnabled {
             service.reload(config: config)
@@ -179,7 +245,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
             clientRootPath = nextConfig.clientEffectiveRootPath
             clientSyncEntireRoot = nextConfig.clientSyncEntireRoot
             refreshPeerSummaries()
-            refreshSelectiveSyncBrowser()
+            refreshSelectiveSyncBrowser(needsDiskRefresh: true, notifyOnChange: true)
             statusMessage = "Saved"
             if nextConfig.isEnabled {
                 service.reload(config: nextConfig)
@@ -201,8 +267,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
 
     func requestRefresh() {
         service.requestRefresh()
-        refreshSelectiveSyncBrowser()
-        notifyDidChange()
+        refreshSelectiveSyncBrowser(needsDiskRefresh: true, notifyOnChange: true)
     }
 
     func stop() {
@@ -223,14 +288,14 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         statusMessage = enabled
             ? "Client role will mirror into \(sanitized(clientRootPath, fallback: NetworkSyncConfig.defaultClientRootPath))."
             : "Client role will stop mirroring after Save."
-        refreshSelectiveSyncBrowser()
+        refreshSelectiveSyncBrowser(needsDiskRefresh: false, notifyOnChange: false)
         notifyDidChange()
     }
 
     func setClientSyncEntireRoot(_ enabled: Bool) {
         clientSyncEntireRoot = enabled
         config.clientSyncEntireRoot = enabled
-        refreshSelectiveSyncBrowser()
+        refreshSelectiveSyncBrowser(needsDiskRefresh: false, notifyOnChange: false)
         statusMessage = enabled
             ? "Whole-root sync is enabled. Previous explicit selection is preserved."
             : "Using explicit selective sync paths. Save to apply."
@@ -266,7 +331,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
 
         config.clientIncludedPaths = selectedPaths.sorted()
         config.clientSyncEntireRoot = clientSyncEntireRoot
-        refreshSelectiveSyncBrowser()
+        refreshSelectiveSyncBrowser(needsDiskRefresh: false, notifyOnChange: false)
         statusMessage = "Selective sync updated. Save to apply."
         notifyDidChange()
     }
@@ -275,7 +340,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         clientSyncEntireRoot = false
         config.clientSyncEntireRoot = false
         config.clientIncludedPaths = selectiveSyncNodes.map(\.path)
-        refreshSelectiveSyncBrowser()
+        refreshSelectiveSyncBrowser(needsDiskRefresh: false, notifyOnChange: false)
         statusMessage = "Selected all visible folders and files. Save to apply."
         notifyDidChange()
     }
@@ -284,7 +349,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         clientSyncEntireRoot = false
         config.clientSyncEntireRoot = false
         config.clientIncludedPaths = []
-        refreshSelectiveSyncBrowser()
+        refreshSelectiveSyncBrowser(needsDiskRefresh: false, notifyOnChange: false)
         statusMessage = "Cleared all explicit selections. Save to apply."
         notifyDidChange()
     }
@@ -302,8 +367,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
 
     func refreshSelectiveSyncPreview() {
         config.clientIncludedPaths = currentIncludedPaths()
-        refreshSelectiveSyncBrowser()
-        notifyDidChange()
+        refreshSelectiveSyncBrowser(needsDiskRefresh: true, notifyOnChange: true)
     }
 
     private func bindService() {
@@ -348,7 +412,8 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
                 detail: transfer.detail
             )
         }
-        refreshSelectiveSyncBrowser()
+        let shouldReloadFromDisk = selectiveSyncCacheNeedsDiskRefresh(for: snapshot)
+        refreshSelectiveSyncBrowser(needsDiskRefresh: shouldReloadFromDisk, notifyOnChange: false)
         notifyDidChange()
     }
 
@@ -358,10 +423,49 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         }
     }
 
-    private func refreshSelectiveSyncBrowser() {
-        let entries = loadAvailableEntries()
-        let localAvailability = loadLocalAvailability()
-        let roots = buildTree(entries: entries, localAvailability: localAvailability)
+    private func refreshSelectiveSyncBrowser(needsDiskRefresh: Bool, notifyOnChange: Bool = false) {
+        if needsDiskRefresh {
+            selectiveSyncRefreshGeneration += 1
+            let generation = selectiveSyncRefreshGeneration
+            let effectiveRootPath = sanitized(clientRootPath, fallback: NetworkSyncConfig.defaultClientRootPath)
+            let stateURL = configManager
+                .networkSyncRuntimeDirectory(rootPath: config.clientEffectiveRootPath)
+                .appendingPathComponent("client-state.json")
+            let loader = selectiveSyncDataLoader
+
+            selectiveSyncRefreshTask?.cancel()
+            selectiveSyncRefreshTask = Task { [weak self] in
+                let startedAt = CFAbsoluteTimeGetCurrent()
+                guard let self else { return }
+                let snapshot = await loader.load(
+                    stateURL: stateURL,
+                    effectiveRootPath: effectiveRootPath
+                )
+                await MainActor.run {
+                    guard generation == self.selectiveSyncRefreshGeneration else {
+                        return
+                    }
+                    self.cachedAvailableEntries = snapshot.entries
+                    self.cachedLocalAvailability = snapshot.localAvailability
+                    self.applySelectiveSyncBrowserCache(logLabel: "disk refresh", startedAt: startedAt, notifyOnChange: notifyOnChange)
+                }
+            }
+            return
+        }
+
+        applySelectiveSyncBrowserCache(logLabel: "cached refresh", startedAt: CFAbsoluteTimeGetCurrent(), notifyOnChange: notifyOnChange)
+    }
+
+    private func applySelectiveSyncBrowserCache(
+        logLabel: String,
+        startedAt: CFAbsoluteTime,
+        notifyOnChange: Bool
+    ) {
+        let previousNodes = selectiveSyncNodes
+        let previousSummary = selectiveSyncSummary
+        let previousHint = selectiveSyncHint
+
+        let roots = buildTree(entries: cachedAvailableEntries, localAvailability: cachedLocalAvailability)
         selectiveSyncNodes = roots.map { materializeNode($0).node }
 
         if !clientEnabled {
@@ -383,6 +487,15 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         } else {
             selectiveSyncSummary = currentIncludedPaths().joined(separator: ", ")
         }
+
+        logSelectiveSyncRefresh(label: logLabel, startedAt: startedAt)
+
+        if notifyOnChange &&
+            (previousNodes != selectiveSyncNodes ||
+             previousSummary != selectiveSyncSummary ||
+             previousHint != selectiveSyncHint) {
+            notifyDidChange()
+        }
     }
 
     private func currentIncludedPaths() -> [String] {
@@ -390,47 +503,6 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
             .map(normalizeRelativePath)
             .filter { !$0.isEmpty }
             .sorted()
-    }
-
-    private func loadAvailableEntries() -> [NetworkSyncFileEntry] {
-        let stateURL = configManager
-            .networkSyncRuntimeDirectory(rootPath: config.clientEffectiveRootPath)
-            .appendingPathComponent("client-state.json")
-        guard let data = try? Data(contentsOf: stateURL),
-              let state = try? JSONDecoder().decode(NetworkSyncClientState.self, from: data)
-        else {
-            return []
-        }
-        return state.knownEntries.values.filter { !$0.deleted }
-    }
-
-    private func loadLocalAvailability() -> Set<String> {
-        let effectiveRootPath = sanitized(clientRootPath, fallback: NetworkSyncConfig.defaultClientRootPath)
-        let trimmedRootPath = effectiveRootPath.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedRootPath.isEmpty else {
-            return []
-        }
-
-        let rootURL = URL(fileURLWithPath: UserPaths.expandHomeVariables(in: trimmedRootPath), isDirectory: true).standardizedFileURL
-        var localPaths: Set<String> = []
-
-        guard let enumerator = fileManager.enumerator(
-            at: rootURL,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        ) else {
-            return localPaths
-        }
-
-        for case let fileURL as URL in enumerator {
-            let relative = normalizeRelativePath(fileURL.path.replacingOccurrences(of: rootURL.path, with: ""))
-            guard !relative.isEmpty else {
-                continue
-            }
-            localPaths.insert(relative)
-        }
-
-        return localPaths
     }
 
     private func buildTree(entries: [NetworkSyncFileEntry], localAvailability: Set<String>) -> [TreeNode] {
@@ -766,6 +838,20 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         for observer in changeObservers.values {
             observer()
         }
+    }
+
+    private func selectiveSyncCacheNeedsDiskRefresh(for snapshot: NetworkSyncRuntimeSnapshot) -> Bool {
+        let nextFingerprint = SelectiveSyncSnapshotFingerprint(
+            conflictIDs: snapshot.conflicts.map(\.id),
+            transferIDs: snapshot.transfers.map(\.id)
+        )
+        defer { lastSelectiveSyncRefreshFingerprint = nextFingerprint }
+        return nextFingerprint != lastSelectiveSyncRefreshFingerprint
+    }
+
+    private func logSelectiveSyncRefresh(label: String, startedAt: CFAbsoluteTime) {
+        let elapsed = (CFAbsoluteTimeGetCurrent() - startedAt) * 1_000
+        NSLog("NetworkSyncViewModel selective sync %@ completed in %.1f ms", label, elapsed)
     }
 }
 
