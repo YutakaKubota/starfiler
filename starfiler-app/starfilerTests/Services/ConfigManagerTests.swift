@@ -436,4 +436,13 @@ final class ConfigManagerTests: XCTestCase {
         XCTAssertTrue(loaded.items[0].isDirectory)
         XCTAssertEqual(loaded.maxItems, 30)
     }
+
+    // MARK: - NetworkSync Finder Badges
+
+    func testFinderBadgeAppearanceUsesStandaloneSymbolsForLegibility() {
+        XCTAssertEqual(NetworkSyncService.finderBadgeAppearance(for: .synced).symbolName, "checkmark")
+        XCTAssertEqual(NetworkSyncService.finderBadgeAppearance(for: .syncing).symbolName, "arrow.triangle.2.circlepath")
+        XCTAssertEqual(NetworkSyncService.finderBadgeAppearance(for: .pending).symbolName, "clock")
+        XCTAssertEqual(NetworkSyncService.finderBadgeAppearance(for: .attention).symbolName, "exclamationmark.triangle.fill")
+    }
 }

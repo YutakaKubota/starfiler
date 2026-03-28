@@ -1466,11 +1466,16 @@ final class NetworkSyncService: NetworkSyncControlling {
         publishSnapshot()
     }
 
-    private enum FinderBadgeStatus {
+    enum FinderBadgeStatus {
         case synced
         case syncing
         case pending
         case attention
+    }
+
+    struct FinderBadgeAppearance {
+        let symbolName: String
+        let accentColor: NSColor
     }
 
     private func refreshClientFinderBadges() {
@@ -1583,24 +1588,9 @@ final class NetworkSyncService: NetworkSyncControlling {
         let baseIcon = NSWorkspace.shared.icon(forFile: fileURL.path)
         baseIcon.isTemplate = false
 
-        let symbolName: String
-        let tint: NSColor
-        switch status {
-        case .synced:
-            symbolName = "checkmark.circle.fill"
-            tint = .systemGreen
-        case .syncing:
-            symbolName = "arrow.triangle.2.circlepath.circle.fill"
-            tint = .systemBlue
-        case .pending:
-            symbolName = "clock.fill"
-            tint = .systemYellow
-        case .attention:
-            symbolName = "exclamationmark.triangle.fill"
-            tint = .systemOrange
-        }
+        let appearance = Self.finderBadgeAppearance(for: status)
 
-        guard let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil) else {
+        guard let symbol = NSImage(systemSymbolName: appearance.symbolName, accessibilityDescription: nil) else {
             return
         }
 
@@ -1611,24 +1601,28 @@ final class NetworkSyncService: NetworkSyncControlling {
         baseIcon.size = canvasSize
         baseIcon.draw(in: NSRect(origin: .zero, size: canvasSize))
 
-        let badgeSide = max(14, canvasSize.width * 0.42)
+        let badgeSide = max(16, canvasSize.width * 0.46)
         let badgeRect = NSRect(
-            x: canvasSize.width - badgeSide,
-            y: 0,
+            x: canvasSize.width - badgeSide - 1,
+            y: 1,
             width: badgeSide,
             height: badgeSide
         )
-        let circlePath = NSBezierPath(ovalIn: badgeRect)
-        tint.setFill()
-        circlePath.fill()
+        let plateRect = badgeRect.insetBy(dx: 0.5, dy: 0.5)
+        let platePath = NSBezierPath(roundedRect: plateRect, xRadius: badgeSide * 0.34, yRadius: badgeSide * 0.34)
+        NSColor.white.withAlphaComponent(0.96).setFill()
+        platePath.fill()
+        appearance.accentColor.setStroke()
+        platePath.lineWidth = max(1.4, badgeSide * 0.1)
+        platePath.stroke()
 
         let configuredSymbol = symbol.withSymbolConfiguration(
-            NSImage.SymbolConfiguration(pointSize: badgeSide * 0.72, weight: .bold)
+            NSImage.SymbolConfiguration(pointSize: badgeSide * 0.68, weight: .bold)
         ) ?? symbol
         let tinted = configuredSymbol.copy() as? NSImage ?? configuredSymbol
         tinted.isTemplate = true
-        tinted.size = NSSize(width: badgeSide * 0.78, height: badgeSide * 0.78)
-        NSColor.white.set()
+        tinted.size = NSSize(width: badgeSide * 0.72, height: badgeSide * 0.72)
+        appearance.accentColor.set()
         let symbolOrigin = NSPoint(
             x: badgeRect.midX - (tinted.size.width / 2),
             y: badgeRect.midY - (tinted.size.height / 2)
@@ -1637,6 +1631,19 @@ final class NetworkSyncService: NetworkSyncControlling {
         badgedIcon.unlockFocus()
 
         NSWorkspace.shared.setIcon(badgedIcon, forFile: fileURL.path, options: [])
+    }
+
+    nonisolated static func finderBadgeAppearance(for status: FinderBadgeStatus) -> FinderBadgeAppearance {
+        switch status {
+        case .synced:
+            return FinderBadgeAppearance(symbolName: "checkmark", accentColor: .systemGreen)
+        case .syncing:
+            return FinderBadgeAppearance(symbolName: "arrow.triangle.2.circlepath", accentColor: .systemBlue)
+        case .pending:
+            return FinderBadgeAppearance(symbolName: "clock", accentColor: .systemOrange)
+        case .attention:
+            return FinderBadgeAppearance(symbolName: "exclamationmark.triangle.fill", accentColor: .systemRed)
+        }
     }
 
     private func updateStatus(_ status: NetworkSyncRuntimeStatus, detail: String) {
