@@ -445,4 +445,40 @@ final class ConfigManagerTests: XCTestCase {
         XCTAssertEqual(NetworkSyncService.finderBadgeAppearance(for: .pending).symbolName, "clock")
         XCTAssertEqual(NetworkSyncService.finderBadgeAppearance(for: .attention).symbolName, "exclamationmark.triangle.fill")
     }
+
+    // MARK: - NetworkSync Pending Deletions
+
+    func testClearPendingDeletionKeepsDescendantPendingDeletion() {
+        var state = NetworkSyncClientState(
+            pendingDeletionPaths: [
+                "docs/from-client.txt",
+                "docs/nested/local.txt"
+            ]
+        )
+
+        state.clearPendingDeletion(at: "docs")
+
+        XCTAssertEqual(
+            state.pendingDeletionPaths,
+            [
+                "docs/from-client.txt",
+                "docs/nested/local.txt"
+            ]
+        )
+    }
+
+    func testClearPendingDeletionTreeRemovesDescendants() {
+        var state = NetworkSyncClientState(
+            pendingDeletionPaths: [
+                "docs",
+                "docs/from-client.txt",
+                "docs/nested/local.txt",
+                "private/hidden.txt"
+            ]
+        )
+
+        state.clearPendingDeletionTree(at: "docs")
+
+        XCTAssertEqual(state.pendingDeletionPaths, ["private/hidden.txt"])
+    }
 }
