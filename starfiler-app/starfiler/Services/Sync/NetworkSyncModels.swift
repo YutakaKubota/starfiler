@@ -63,6 +63,7 @@ struct NetworkSyncRuntimeSnapshot: Sendable {
     var conflicts: [NetworkSyncConflictRecord]
     var transfers: [NetworkSyncTransferRecord]
     var activeTransfers: [String: NetworkSyncTransferActivity]
+    var browserStateVersion: Int
 
     static let disabled = NetworkSyncRuntimeSnapshot(
         status: .disabled,
@@ -70,7 +71,8 @@ struct NetworkSyncRuntimeSnapshot: Sendable {
         peers: [],
         conflicts: [],
         transfers: [],
-        activeTransfers: [:]
+        activeTransfers: [:],
+        browserStateVersion: 0
     )
 }
 

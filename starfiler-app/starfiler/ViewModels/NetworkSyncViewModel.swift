@@ -7,48 +7,23 @@ private actor SelectiveSyncBrowserDataLoader {
         let localAvailability: Set<String>
     }
 
-    func load(stateURL: URL, effectiveRootPath: String) -> Snapshot {
-        let entries = loadAvailableEntries(from: stateURL)
-        let localAvailability = loadLocalAvailability(rootPath: effectiveRootPath)
-        return Snapshot(entries: entries, localAvailability: localAvailability)
+    func load(stateURL: URL) -> Snapshot {
+        guard let state = loadClientState(from: stateURL) else {
+            return Snapshot(entries: [], localAvailability: [])
+        }
+        return Snapshot(
+            entries: state.knownEntries.values.filter { !$0.deleted },
+            localAvailability: Set(state.materializedPaths.map(Self.normalizeRelativePath))
+        )
     }
 
-    private func loadAvailableEntries(from stateURL: URL) -> [NetworkSyncFileEntry] {
+    private func loadClientState(from stateURL: URL) -> NetworkSyncClientState? {
         guard let data = try? Data(contentsOf: stateURL),
               let state = try? JSONDecoder().decode(NetworkSyncClientState.self, from: data)
         else {
-            return []
+            return nil
         }
-        return state.knownEntries.values.filter { !$0.deleted }
-    }
-
-    private func loadLocalAvailability(rootPath: String) -> Set<String> {
-        let trimmedRootPath = rootPath.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedRootPath.isEmpty else {
-            return []
-        }
-
-        let fileManager = FileManager.default
-        let rootURL = URL(fileURLWithPath: UserPaths.expandHomeVariables(in: trimmedRootPath), isDirectory: true).standardizedFileURL
-        var localPaths: Set<String> = []
-
-        guard let enumerator = fileManager.enumerator(
-            at: rootURL,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        ) else {
-            return localPaths
-        }
-
-        for case let fileURL as URL in enumerator {
-            let relative = Self.normalizeRelativePath(fileURL.path.replacingOccurrences(of: rootURL.path, with: ""))
-            guard !relative.isEmpty else {
-                continue
-            }
-            localPaths.insert(relative)
-        }
-
-        return localPaths
+        return state
     }
 
     private static func normalizeRelativePath(_ value: String) -> String {
@@ -57,10 +32,11 @@ private actor SelectiveSyncBrowserDataLoader {
 }
 
 private struct SelectiveSyncSnapshotFingerprint: Equatable {
+    let browserStateVersion: Int
     let conflictIDs: [String]
     let transferIDs: [String]
 
-    static let empty = SelectiveSyncSnapshotFingerprint(conflictIDs: [], transferIDs: [])
+    static let empty = SelectiveSyncSnapshotFingerprint(browserStateVersion: 0, conflictIDs: [], transferIDs: [])
 }
 
 enum SelectiveSyncSelectionState: Sendable {
@@ -427,7 +403,6 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         if needsDiskRefresh {
             selectiveSyncRefreshGeneration += 1
             let generation = selectiveSyncRefreshGeneration
-            let effectiveRootPath = sanitized(clientRootPath, fallback: NetworkSyncConfig.defaultClientRootPath)
             let stateURL = configManager
                 .networkSyncRuntimeDirectory(rootPath: config.clientEffectiveRootPath)
                 .appendingPathComponent("client-state.json")
@@ -437,10 +412,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
             selectiveSyncRefreshTask = Task { [weak self] in
                 let startedAt = CFAbsoluteTimeGetCurrent()
                 guard let self else { return }
-                let snapshot = await loader.load(
-                    stateURL: stateURL,
-                    effectiveRootPath: effectiveRootPath
-                )
+                let snapshot = await loader.load(stateURL: stateURL)
                 await MainActor.run {
                     guard generation == self.selectiveSyncRefreshGeneration else {
                         return
@@ -842,6 +814,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
 
     private func selectiveSyncCacheNeedsDiskRefresh(for snapshot: NetworkSyncRuntimeSnapshot) -> Bool {
         let nextFingerprint = SelectiveSyncSnapshotFingerprint(
+            browserStateVersion: snapshot.browserStateVersion,
             conflictIDs: snapshot.conflicts.map(\.id),
             transferIDs: snapshot.transfers.map(\.id)
         )

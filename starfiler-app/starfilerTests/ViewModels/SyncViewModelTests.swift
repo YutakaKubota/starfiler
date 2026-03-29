@@ -349,7 +349,8 @@ final class SyncViewModelTests: XCTestCase {
                 peers: [],
                 conflicts: [],
                 transfers: [],
-                activeTransfers: [:]
+                activeTransfers: [:],
+                browserStateVersion: 0
             )
         )
         try? await Task.sleep(for: .milliseconds(150))

@@ -166,7 +166,8 @@ final class NetworkSyncCoordinator: NetworkSyncControlling {
             peers: peers,
             conflicts: Array(conflicts.prefix(20)),
             transfers: Array(transfers.prefix(20)),
-            activeTransfers: activeTransfers
+            activeTransfers: activeTransfers,
+            browserStateVersion: max(serverSnapshot.browserStateVersion, clientSnapshot.browserStateVersion)
         )
     }
 

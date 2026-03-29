@@ -60,14 +60,22 @@ final class NetworkSyncService: NetworkSyncControlling {
     private var localSnapshot: [String: NetworkSyncFileEntry] = [:]
     private var serverState = NetworkSyncServerState()
     private var clientState = NetworkSyncClientState()
+    private var lastSavedClientStateData: Data?
+    private var acknowledgedClientRevisionsByDevice: [String: [String: Int]] = [:]
     private var peerRuntimes: [String: NetworkSyncPeerRuntime] = [:]
     private var conflicts: [NetworkSyncConflictRecord] = []
     private var transfers: [NetworkSyncTransferRecord] = []
     private var activeTransfersByPath: [String: NetworkSyncTransferActivity] = [:]
+    private var browserStateVersion = 0
     private var isApplyingRemoteChange = false
     private var lastFinderBadgeStatuses: [String: FinderBadgeStatus] = [:]
     private var pendingFinderBadgeStatuses: [String: FinderBadgeStatus?] = [:]
     private var pendingFinderBadgeFlushTask: Task<Void, Never>?
+    private var suppressLocalRootEventsUntil = Date.distantPast
+    private var suppressedLocalRootRetryTask: Task<Void, Never>?
+    private var isProcessingLocalRootChange = false
+    private var hasPendingLocalRootChange = false
+    private var needsStateRefreshAfterLocalChange = false
 
     init(
         role: SyncNodeMode,
@@ -157,6 +165,12 @@ final class NetworkSyncService: NetworkSyncControlling {
         pendingFinderBadgeFlushTask = nil
         pendingFinderBadgeStatuses.removeAll()
         lastFinderBadgeStatuses.removeAll()
+        suppressedLocalRootRetryTask?.cancel()
+        suppressedLocalRootRetryTask = nil
+        suppressLocalRootEventsUntil = .distantPast
+        isProcessingLocalRootChange = false
+        hasPendingLocalRootChange = false
+        needsStateRefreshAfterLocalChange = false
 
         heartbeatTimer?.invalidate()
         heartbeatTimer = nil
@@ -187,7 +201,15 @@ final class NetworkSyncService: NetworkSyncControlling {
         rootURL = nil
         localSnapshot = [:]
         snapshot = config.isEnabled
-            ? NetworkSyncRuntimeSnapshot(status: .offline, detail: "Network sync stopped.", peers: [], conflicts: conflicts, transfers: transfers, activeTransfers: [:])
+            ? NetworkSyncRuntimeSnapshot(
+                status: .offline,
+                detail: "Network sync stopped.",
+                peers: [],
+                conflicts: conflicts,
+                transfers: transfers,
+                activeTransfers: [:],
+                browserStateVersion: browserStateVersion
+            )
             : .disabled
         publishSnapshot()
     }
@@ -220,15 +242,45 @@ final class NetworkSyncService: NetworkSyncControlling {
     private func startPathMonitor(for rootURL: URL) {
         let monitor = NetworkSyncPathMonitor(url: rootURL, debounceInterval: config.syncDebounceSeconds) { [weak self] in
             Task { @MainActor in
-                await self?.handleLocalRootChange()
+                self?.scheduleLocalRootChangeHandling()
             }
         }
         monitor.start()
         pathMonitor = monitor
     }
 
+    private func scheduleLocalRootChangeHandling() {
+        guard !isProcessingLocalRootChange else {
+            hasPendingLocalRootChange = true
+            return
+        }
+
+        isProcessingLocalRootChange = true
+        Task { @MainActor [weak self] in
+            await self?.drainLocalRootChanges()
+        }
+    }
+
+    private func drainLocalRootChanges() async {
+        repeat {
+            hasPendingLocalRootChange = false
+            await handleLocalRootChange()
+        } while hasPendingLocalRootChange
+
+        isProcessingLocalRootChange = false
+
+        if needsStateRefreshAfterLocalChange {
+            needsStateRefreshAfterLocalChange = false
+            requestServerStateSnapshot()
+        }
+    }
+
     private func handleLocalRootChange() async {
         guard !isApplyingRemoteChange, let rootURL else {
+            return
+        }
+        guard Date() >= suppressLocalRootEventsUntil else {
+            scheduleSuppressedLocalRootRetry()
             return
         }
 
@@ -239,11 +291,11 @@ final class NetworkSyncService: NetworkSyncControlling {
                 try await reconcileServerStateWithDisk(broadcast: true, originDeviceID: nil)
             case .client:
                 let latestSnapshot = try await scanEntries(at: rootURL)
-                let changes = diff(old: localSnapshot, new: latestSnapshot)
+                var changes = diff(old: localSnapshot, new: latestSnapshot)
+                let updatedMaterializedPaths = Set(latestSnapshot.keys)
                 let deletedPaths = Set(
-                    changes.compactMap { change -> String? in
-                        guard case .delete(let path) = change else { return nil }
-                        return shouldSyncPath(path, syncEntireRoot: config.syncEntireRoot, includedPaths: config.includedPaths) ? path : nil
+                    clientState.materializedPaths.subtracting(updatedMaterializedPaths).filter {
+                        shouldSyncPath($0, syncEntireRoot: config.syncEntireRoot, includedPaths: config.includedPaths)
                     }
                 )
                 let upsertedPaths = Set(
@@ -252,10 +304,29 @@ final class NetworkSyncService: NetworkSyncControlling {
                         return entry.relativePath
                     }
                 )
+                let deletedChanges = Set(
+                    changes.compactMap { change -> String? in
+                        guard case .delete(let path) = change else { return nil }
+                        return path
+                    }
+                )
+                for path in deletedPaths.subtracting(deletedChanges).sorted() {
+                    changes.append(.delete(path))
+                }
+                var updatedPendingDeletionPaths = clientState.pendingDeletionPaths
+                updatedPendingDeletionPaths.formUnion(deletedPaths)
+                updatedPendingDeletionPaths.subtract(upsertedPaths)
+
+                guard !changes.isEmpty ||
+                    updatedMaterializedPaths != clientState.materializedPaths ||
+                    updatedPendingDeletionPaths != clientState.pendingDeletionPaths else {
+                    return
+                }
+
                 localSnapshot = latestSnapshot
-                clientState.materializedPaths = Set(latestSnapshot.keys)
-                clientState.pendingDeletionPaths.formUnion(deletedPaths)
-                clientState.pendingDeletionPaths.subtract(upsertedPaths)
+                clientState.materializedPaths = updatedMaterializedPaths
+                clientState.pendingDeletionPaths = updatedPendingDeletionPaths
+                stageClientLocalChanges(changes)
                 saveClientState()
                 refreshClientFinderBadges()
                 try await pushClientChanges(changes)
@@ -571,39 +642,13 @@ final class NetworkSyncService: NetworkSyncControlling {
     }
 
     private func applyServerSnapshot(_ entries: [NetworkSyncFileEntry], over connection: NWConnection) async throws {
+        if isProcessingLocalRootChange || hasPendingLocalRootChange {
+            needsStateRefreshAfterLocalChange = true
+            return
+        }
+
         let remoteEntries = Dictionary(uniqueKeysWithValues: entries.map { ($0.relativePath, $0) })
         let currentLocal = try await scanEntries(at: rootURL!)
-        let trackedKnownEntries = clientState.knownEntries.filter {
-            clientState.materializedPaths.contains($0.key) || hasPendingDeletion(for: $0.key, pendingDeletionPaths: clientState.pendingDeletionPaths)
-        }
-        let localChanges = diffAgainstKnown(known: trackedKnownEntries, local: currentLocal)
-
-        for change in localChanges {
-            let relativePath: String
-            switch change {
-            case .upsert(let entry):
-                relativePath = entry.relativePath
-            case .delete(let path):
-                relativePath = path
-            }
-
-            guard shouldSyncPath(relativePath, syncEntireRoot: config.syncEntireRoot, includedPaths: config.includedPaths) else {
-                continue
-            }
-
-            switch change {
-            case .upsert(let entry):
-                try await sendFile(entry: entry, baseRevision: clientState.knownEntries[entry.relativePath]?.revision ?? 0, over: connection)
-            case .delete(let path):
-                let payload = NetworkSyncDeletePayload(
-                    relativePath: path,
-                    baseRevision: clientState.knownEntries[path]?.revision ?? 0,
-                    revision: 0,
-                    originDeviceID: deviceID
-                )
-                try sendEnvelope(.make(.delete, payload: payload, encoder: encoder), over: connection)
-            }
-        }
 
         for entry in remoteEntries.values.sorted(by: { $0.relativePath < $1.relativePath }) {
             guard shouldSyncPath(entry.relativePath, syncEntireRoot: config.syncEntireRoot, includedPaths: config.includedPaths) else {
@@ -682,6 +727,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         isApplyingRemoteChange = true
         defer { isApplyingRemoteChange = false }
 
+        suppressLocalRootEvents(for: localRootEventSuppressionWindow())
         try await writeTransfer(incoming, hash: hash, under: rootURL)
         let entry = NetworkSyncFileEntry(
             relativePath: incoming.start.relativePath,
@@ -718,6 +764,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         defer { isApplyingRemoteChange = false }
 
         let destinationURL = rootURL.appendingPathComponent(payload.relativePath)
+        suppressLocalRootEvents(for: localRootEventSuppressionWindow())
         if fileManager.fileExists(atPath: destinationURL.path) {
             try fileManager.removeItem(at: destinationURL)
         }
@@ -745,7 +792,12 @@ final class NetworkSyncService: NetworkSyncControlling {
 
         let currentEntry = serverState.entries[incoming.start.relativePath]
         let payloadHash: String? = incoming.start.isDirectory ? nil : (hash ?? sha256Hex(for: incoming.data))
-        let hasRevisionConflict = currentEntry.map { $0.revision != incoming.start.baseRevision } ?? (incoming.start.baseRevision != 0)
+        let effectiveBaseRevision = effectiveClientBaseRevision(
+            requestedBaseRevision: incoming.start.baseRevision,
+            relativePath: incoming.start.relativePath,
+            deviceID: incoming.start.originDeviceID
+        )
+        let hasRevisionConflict = currentEntry.map { $0.revision != effectiveBaseRevision } ?? (effectiveBaseRevision != 0)
         let sameContent: Bool
         if incoming.start.isDirectory {
             sameContent = currentEntry?.isDirectory == true && currentEntry?.deleted == false
@@ -805,6 +857,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         isApplyingRemoteChange = true
         defer { isApplyingRemoteChange = false }
 
+        suppressLocalRootEvents(for: localRootEventSuppressionWindow())
         try await writeTransfer(acceptedTransfer, hash: payloadHash, under: rootURL)
         let entry = NetworkSyncFileEntry(
             relativePath: acceptedTransfer.start.relativePath,
@@ -816,6 +869,11 @@ final class NetworkSyncService: NetworkSyncControlling {
             deleted: false
         )
         serverState.entries[entry.relativePath] = entry
+        recordAcknowledgedClientRevision(
+            revision,
+            for: entry.relativePath,
+            deviceID: incoming.start.originDeviceID
+        )
         try saveServerState()
         localSnapshot = try await scanEntries(at: rootURL)
         appendTransfer(relativePath: entry.relativePath, direction: .upload, status: "Accepted", progress: 1, detail: "Uploaded to server")
@@ -827,7 +885,12 @@ final class NetworkSyncService: NetworkSyncControlling {
         guard let rootURL else { return }
 
         let currentEntry = serverState.entries[payload.relativePath]
-        let hasRevisionConflict = currentEntry.map { $0.revision != payload.baseRevision } ?? (payload.baseRevision != 0)
+        let effectiveBaseRevision = effectiveClientBaseRevision(
+            requestedBaseRevision: payload.baseRevision,
+            relativePath: payload.relativePath,
+            deviceID: payload.originDeviceID
+        )
+        let hasRevisionConflict = currentEntry.map { $0.revision != effectiveBaseRevision } ?? (effectiveBaseRevision != 0)
         if hasRevisionConflict {
             appendConflict(relativePath: payload.relativePath, detail: "Deletion conflict from \(context.hello?.displayName ?? "client")")
             return
@@ -837,6 +900,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         defer { isApplyingRemoteChange = false }
 
         let destinationURL = rootURL.appendingPathComponent(payload.relativePath)
+        suppressLocalRootEvents(for: localRootEventSuppressionWindow())
         if fileManager.fileExists(atPath: destinationURL.path) {
             try fileManager.removeItem(at: destinationURL)
         }
@@ -851,6 +915,11 @@ final class NetworkSyncService: NetworkSyncControlling {
             deleted: true
         )
         serverState.entries[payload.relativePath] = tombstone
+        recordAcknowledgedClientRevision(
+            tombstone.revision,
+            for: payload.relativePath,
+            deviceID: payload.originDeviceID
+        )
         try saveServerState()
         localSnapshot = try await scanEntries(at: rootURL)
         try sendStateSnapshot(over: context.connection)
@@ -860,6 +929,46 @@ final class NetworkSyncService: NetworkSyncControlling {
     private enum LocalDiff {
         case upsert(NetworkSyncFileEntry)
         case delete(String)
+    }
+
+    private func stageClientLocalChanges(_ changes: [LocalDiff]) {
+        guard config.role == .client else {
+            return
+        }
+
+        for change in changes {
+            switch change {
+            case .upsert(let entry):
+                guard shouldSyncPath(entry.relativePath, syncEntireRoot: config.syncEntireRoot, includedPaths: config.includedPaths) else {
+                    continue
+                }
+                let previousRevision = clientState.knownEntries[entry.relativePath]?.revision ?? 0
+                clientState.knownEntries[entry.relativePath] = NetworkSyncFileEntry(
+                    relativePath: entry.relativePath,
+                    isDirectory: entry.isDirectory,
+                    size: entry.size,
+                    modificationTimestamp: entry.modificationTimestamp,
+                    contentHash: entry.contentHash,
+                    revision: previousRevision,
+                    deleted: false
+                )
+                clearPendingDeletion(at: entry.relativePath)
+            case .delete(let path):
+                guard shouldSyncPath(path, syncEntireRoot: config.syncEntireRoot, includedPaths: config.includedPaths) else {
+                    continue
+                }
+                let existingEntry = clientState.knownEntries[path]
+                clientState.knownEntries[path] = NetworkSyncFileEntry(
+                    relativePath: path,
+                    isDirectory: existingEntry?.isDirectory ?? false,
+                    size: 0,
+                    modificationTimestamp: Date().timeIntervalSince1970,
+                    contentHash: nil,
+                    revision: existingEntry?.revision ?? 0,
+                    deleted: true
+                )
+            }
+        }
     }
 
     private func pushClientChanges(_ changes: [LocalDiff]) async throws {
@@ -1238,6 +1347,24 @@ final class NetworkSyncService: NetworkSyncControlling {
         try sendEnvelope(.make(.stateSnapshot, payload: NetworkSyncStateSnapshotPayload(entries: entries), encoder: encoder), over: connection)
     }
 
+    private func requestServerStateSnapshot() {
+        guard config.role == .client,
+              let connectionID = clientConnectionID,
+              let connection = connections[connectionID]?.connection
+        else {
+            return
+        }
+
+        try? sendEnvelope(
+            .make(
+                .stateRequest,
+                payload: NetworkSyncStateRequestPayload(syncEntireRoot: config.syncEntireRoot, includedPaths: config.includedPaths),
+                encoder: encoder
+            ),
+            over: connection
+        )
+    }
+
     private func loadServerState() throws {
         let stateURL = serverStateURL()
         if !fileManager.fileExists(atPath: stateURL.path) {
@@ -1266,15 +1393,26 @@ final class NetworkSyncService: NetworkSyncControlling {
         if let data = try? Data(contentsOf: stateURL),
            let state = try? decoder.decode(NetworkSyncClientState.self, from: data) {
             clientState = state
+            lastSavedClientStateData = data
         } else {
             clientState = NetworkSyncClientState()
+            lastSavedClientStateData = nil
         }
     }
 
     private func saveClientState() {
         let stateURL = clientStateURL()
+        guard let data = try? encoder.encode(clientState) else {
+            return
+        }
+        guard data != lastSavedClientStateData || !fileManager.fileExists(atPath: stateURL.path) else {
+            return
+        }
         try? fileManager.createDirectory(at: stateURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? encoder.encode(clientState).write(to: stateURL, options: .atomic)
+        try? data.write(to: stateURL, options: .atomic)
+        lastSavedClientStateData = data
+        browserStateVersion += 1
+        snapshot.browserStateVersion = browserStateVersion
     }
 
     private func serverStateURL() -> URL {
@@ -1540,6 +1678,7 @@ final class NetworkSyncService: NetworkSyncControlling {
             return
         }
 
+        suppressLocalRootEvents(for: max(0.5, config.syncDebounceSeconds * 2))
         NSWorkspace.shared.setIcon(nil, forFile: fileURL.path, options: [])
     }
 
@@ -1577,6 +1716,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         let startedAt = CFAbsoluteTimeGetCurrent()
         let updates = pendingFinderBadgeStatuses
         pendingFinderBadgeStatuses.removeAll()
+        suppressLocalRootEvents(for: max(0.5, config.syncDebounceSeconds * 2))
 
         for (path, status) in updates {
             if let status {
@@ -1639,6 +1779,32 @@ final class NetworkSyncService: NetworkSyncControlling {
         NSWorkspace.shared.setIcon(badgedIcon, forFile: fileURL.path, options: [])
     }
 
+    private func suppressLocalRootEvents(for duration: TimeInterval) {
+        let deadline = Date().addingTimeInterval(duration)
+        if deadline > suppressLocalRootEventsUntil {
+            suppressLocalRootEventsUntil = deadline
+        }
+    }
+
+    private func scheduleSuppressedLocalRootRetry() {
+        hasPendingLocalRootChange = true
+        guard suppressedLocalRootRetryTask == nil else {
+            return
+        }
+
+        let delay = max(suppressLocalRootEventsUntil.timeIntervalSinceNow, 0.1)
+        suppressedLocalRootRetryTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard let self else { return }
+            self.suppressedLocalRootRetryTask = nil
+            self.scheduleLocalRootChangeHandling()
+        }
+    }
+
+    private func localRootEventSuppressionWindow() -> TimeInterval {
+        max(0.5, config.syncDebounceSeconds * 2)
+    }
+
     nonisolated static func finderBadgeAppearance(for status: FinderBadgeStatus) -> FinderBadgeAppearance {
         switch status {
         case .synced:
@@ -1664,6 +1830,32 @@ final class NetworkSyncService: NetworkSyncControlling {
         publishSnapshot()
     }
 
+    private func effectiveClientBaseRevision(
+        requestedBaseRevision: Int,
+        relativePath: String,
+        deviceID: UUID
+    ) -> Int {
+        let normalizedPath = normalizeRelativePath(relativePath)
+        guard !normalizedPath.isEmpty,
+              let acknowledgedRevision = acknowledgedClientRevisionsByDevice[deviceID.uuidString]?[normalizedPath],
+              requestedBaseRevision < acknowledgedRevision
+        else {
+            return requestedBaseRevision
+        }
+        return acknowledgedRevision
+    }
+
+    private func recordAcknowledgedClientRevision(_ revision: Int, for relativePath: String, deviceID: UUID) {
+        let normalizedPath = normalizeRelativePath(relativePath)
+        guard !normalizedPath.isEmpty else {
+            return
+        }
+
+        var revisions = acknowledgedClientRevisionsByDevice[deviceID.uuidString] ?? [:]
+        revisions[normalizedPath] = revision
+        acknowledgedClientRevisionsByDevice[deviceID.uuidString] = revisions
+    }
+
     private func logDuration(_ operation: String, startedAt: CFAbsoluteTime) {
         let elapsed = (CFAbsoluteTimeGetCurrent() - startedAt) * 1_000
         NSLog("NetworkSyncService[%@] %@ completed in %.1f ms", role.rawValue, operation, elapsed)
@@ -1674,6 +1866,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         snapshot.conflicts = conflicts
         snapshot.transfers = transfers
         snapshot.activeTransfers = activeTransfersByPath
+        snapshot.browserStateVersion = browserStateVersion
         onSnapshot?(snapshot)
     }
 
@@ -1755,6 +1948,12 @@ private actor NetworkSyncExecutionContext {
                 enumerator.skipDescendants()
                 continue
             }
+            if Self.shouldIgnoreLocalArtifact(at: fileURL) {
+                if Self.isDirectoryURL(fileURL) {
+                    enumerator.skipDescendants()
+                }
+                continue
+            }
 
             let relativePath = Self.relativePath(from: rootURL, to: fileURL)
             guard Self.shouldSyncPath(relativePath, syncEntireRoot: syncEntireRoot, includedPaths: includedPaths),
@@ -1798,6 +1997,12 @@ private actor NetworkSyncExecutionContext {
         for case let fileURL as URL in enumerator {
             if fileURL.path.contains("/.starfiler-sync/") || fileURL.lastPathComponent == ".starfiler-sync" {
                 enumerator.skipDescendants()
+                continue
+            }
+            if Self.shouldIgnoreLocalArtifact(at: fileURL) {
+                if Self.isDirectoryURL(fileURL) {
+                    enumerator.skipDescendants()
+                }
                 continue
             }
 
@@ -1912,6 +2117,10 @@ private actor NetworkSyncExecutionContext {
     private static func isDirectoryURL(_ url: URL) -> Bool {
         (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
     }
+
+    private static func shouldIgnoreLocalArtifact(at url: URL) -> Bool {
+        url.lastPathComponent == "Icon\r"
+    }
 }
 
 private extension NWEndpoint {
@@ -1958,9 +2167,13 @@ private final class NetworkSyncPathMonitor {
             kFSEventStreamCreateFlagUseCFTypes
         )
 
-        let callback: FSEventStreamCallback = { _, info, _, _, _, _ in
+        let callback: FSEventStreamCallback = { _, info, eventCount, _, eventFlags, _ in
             guard let info else { return }
             let monitor = Unmanaged<NetworkSyncPathMonitor>.fromOpaque(info).takeUnretainedValue()
+            let flags = UnsafeBufferPointer(start: eventFlags, count: eventCount)
+            guard flags.contains(where: NetworkSyncPathMonitor.isMeaningfulEvent) else {
+                return
+            }
             monitor.scheduleCallback()
         }
 
@@ -1996,9 +2209,48 @@ private final class NetworkSyncPathMonitor {
     }
 
     private func scheduleCallback() {
-        pendingWorkItem?.cancel()
-        let workItem = DispatchWorkItem(block: callback)
+        guard pendingWorkItem == nil else {
+            return
+        }
+
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.pendingWorkItem = nil
+            self?.callback()
+        }
         pendingWorkItem = workItem
         queue.asyncAfter(deadline: .now() + debounceInterval, execute: workItem)
+    }
+
+    private static func isMeaningfulEvent(_ flags: FSEventStreamEventFlags) -> Bool {
+        let metadataOnlyFlags = Self.eventFlags([
+            kFSEventStreamEventFlagItemInodeMetaMod,
+            kFSEventStreamEventFlagItemFinderInfoMod,
+            kFSEventStreamEventFlagItemChangeOwner,
+            kFSEventStreamEventFlagItemXattrMod,
+        ])
+
+        let meaningfulFlags = Self.eventFlags([
+            kFSEventStreamEventFlagMustScanSubDirs,
+            kFSEventStreamEventFlagRootChanged,
+            kFSEventStreamEventFlagMount,
+            kFSEventStreamEventFlagUnmount,
+            kFSEventStreamEventFlagItemCreated,
+            kFSEventStreamEventFlagItemRemoved,
+            kFSEventStreamEventFlagItemRenamed,
+            kFSEventStreamEventFlagItemModified,
+            kFSEventStreamEventFlagItemCloned,
+        ])
+
+        if flags & meaningfulFlags != 0 {
+            return true
+        }
+
+        return flags & ~metadataOnlyFlags != 0
+    }
+
+    private static func eventFlags(_ values: [Int]) -> FSEventStreamEventFlags {
+        values.reduce(FSEventStreamEventFlags(0)) { partial, value in
+            partial | FSEventStreamEventFlags(value)
+        }
     }
 }

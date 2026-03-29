@@ -58,6 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private let launchOptions = LaunchOptions()
+    private let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     private var mainWindowController: MainWindowController?
     private var settingsWindowController: SettingsWindowController?
     private var syncStatusBarController: SyncStatusBarController?
@@ -644,6 +645,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor
     private func configureNetworkSyncIfNeeded() {
+        guard !isRunningTests else {
+            return
+        }
         guard networkSyncViewModel == nil else {
             syncStatusBarController?.refresh()
             return

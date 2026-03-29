@@ -23,6 +23,7 @@
 		8E4331A82F9C8E9640C4A956 /* BaseUITestCase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DA02617092C30A871EDC359 /* BaseUITestCase.swift */; };
 		95DC124F2E566D7FC0F5A7E2 /* TaskCenterEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD55A301B5172AC835D08ACF /* TaskCenterEntry.swift */; };
 		9975337F833EC3A3DE4C5BED /* NetworkSyncViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F563A0DF2411E06F4D7012FD /* NetworkSyncViewModel.swift */; };
+		B1A63F9812D0433F8D42F1A1 /* NetworkSyncServiceIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A63F9812D0433F8D42F1A2 /* NetworkSyncServiceIntegrationTests.swift */; };
 		A044C0BCB493112E23403E93 /* ShortcutRegressionUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 230E7EDA0891551B6E0419BC /* ShortcutRegressionUITests.swift */; };
 		A6F98E73AAE0447658073E71 /* SandboxFixtureWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 625BBF22ED7C8DF9F963DCEE /* SandboxFixtureWorkspace.swift */; };
 		A71C439AA3EC244DCEAA171B /* NetworkSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136234B68464371CF5FC3301 /* NetworkSyncService.swift */; };
@@ -205,6 +206,7 @@
 		876B6E0CED4A9C9FCAB9CF9C /* FileSystemServiceIntegrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileSystemServiceIntegrationTests.swift; sourceTree = "<group>"; };
 		8B5EE3F03461C71A6E06F375 /* SyncStatusPopoverViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncStatusBar/SyncStatusPopoverViewController.swift; sourceTree = "<group>"; };
 		A8744C2A33062020B5AC45A7 /* FileOperationServiceIntegrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileOperationServiceIntegrationTests.swift; sourceTree = "<group>"; };
+		B1A63F9812D0433F8D42F1A2 /* NetworkSyncServiceIntegrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NetworkSyncServiceIntegrationTests.swift; sourceTree = "<group>"; };
 		B3D9FF421A39B5F75121AF11 /* NetworkSyncSettingsViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NetworkSyncSettingsViewController.swift; sourceTree = "<group>"; };
 		BB0000000000000000000001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		BB0000000000000000000002 /* MainWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowController.swift; sourceTree = "<group>"; };
@@ -801,6 +803,7 @@
 				FF000000000000000000002A /* PinnedItemsServiceTests.swift */,
 				876B6E0CED4A9C9FCAB9CF9C /* FileSystemServiceIntegrationTests.swift */,
 				A8744C2A33062020B5AC45A7 /* FileOperationServiceIntegrationTests.swift */,
+				B1A63F9812D0433F8D42F1A2 /* NetworkSyncServiceIntegrationTests.swift */,
 				02AAF2688F1616CD1D0FD85C /* SecurityScopedBookmarkServiceIntegrationTests.swift */,
 				DD000000000000000000001A /* TerminalSessionServiceTests.swift */,
 			);
@@ -1192,6 +1195,7 @@
 				609C81EFEC2EC739DF00A1A9 /* GlobalActionRouterTests.swift in Sources */,
 				DF99C6034CD13D0468E0FD89 /* FileSystemServiceIntegrationTests.swift in Sources */,
 				BA1730EC76F454E2A789144E /* FileOperationServiceIntegrationTests.swift in Sources */,
+				B1A63F9812D0433F8D42F1A1 /* NetworkSyncServiceIntegrationTests.swift in Sources */,
 				45DFBE0D6C1ABE4E2390F550 /* SecurityScopedBookmarkServiceIntegrationTests.swift in Sources */,
 				A6F98E73AAE0447658073E71 /* SandboxFixtureWorkspace.swift in Sources */,
 			);
