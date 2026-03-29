@@ -7,6 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F1B0000000000000000000D1 /* BookmarksSettingsViewController+TableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A0000000000000000000D1 /* BookmarksSettingsViewController+TableView.swift */; };
+		F1B0000000000000000000D2 /* BookmarksSettingsViewController+DragReorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A0000000000000000000D2 /* BookmarksSettingsViewController+DragReorder.swift */; };
+		F1B0000000000000000000D3 /* BookmarksSettingsViewController+AlertDialogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A0000000000000000000D3 /* BookmarksSettingsViewController+AlertDialogs.swift */; };
+		F1B0000000000000000000D4 /* NetworkSyncSettingsViewController+TableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A0000000000000000000D4 /* NetworkSyncSettingsViewController+TableView.swift */; };
+		F1B0000000000000000000D5 /* NetworkSyncSettingsViewController+Controls.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A0000000000000000000D5 /* NetworkSyncSettingsViewController+Controls.swift */; };
+		F1B0000000000000000000D6 /* SidebarViewController+OutlineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A0000000000000000000D6 /* SidebarViewController+OutlineView.swift */; };
+		F1B0000000000000000000D7 /* SidebarViewController+ContextMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A0000000000000000000D7 /* SidebarViewController+ContextMenu.swift */; };
 		26291D95CC1DE84D46C97B18 /* GlobalActionRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB62D59F8B8F0D0859950655 /* GlobalActionRouter.swift */; };
 		41EE05820918C9D664F40420 /* FeatureRegressionUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA70B511E56E61D85B994DC /* FeatureRegressionUITests.swift */; };
 		45DFBE0D6C1ABE4E2390F550 /* SecurityScopedBookmarkServiceIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02AAF2688F1616CD1D0FD85C /* SecurityScopedBookmarkServiceIntegrationTests.swift */; };
@@ -238,6 +245,8 @@
 		A8744C2A33062020B5AC45A7 /* FileOperationServiceIntegrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileOperationServiceIntegrationTests.swift; sourceTree = "<group>"; };
 		B1A63F9812D0433F8D42F1A2 /* NetworkSyncServiceIntegrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NetworkSyncServiceIntegrationTests.swift; sourceTree = "<group>"; };
 		B3D9FF421A39B5F75121AF11 /* NetworkSyncSettingsViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NetworkSyncSettingsViewController.swift; sourceTree = "<group>"; };
+		F1A0000000000000000000D4 /* NetworkSyncSettingsViewController+TableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NetworkSyncSettingsViewController+TableView.swift"; sourceTree = "<group>"; };
+		F1A0000000000000000000D5 /* NetworkSyncSettingsViewController+Controls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NetworkSyncSettingsViewController+Controls.swift"; sourceTree = "<group>"; };
 		BB0000000000000000000001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		BB00000000000000000000A1 /* AppDelegate+MainMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+MainMenu.swift"; sourceTree = "<group>"; };
 		BB00000000000000000000A2 /* AppDelegate+SettingsWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+SettingsWindow.swift"; sourceTree = "<group>"; };
@@ -301,6 +310,8 @@
 		BB000000000000000000002B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BB000000000000000000002C /* SidebarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarViewModel.swift; sourceTree = "<group>"; };
 		BB000000000000000000002D /* SidebarViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarViewController.swift; sourceTree = "<group>"; };
+		F1A0000000000000000000D6 /* SidebarViewController+OutlineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarViewController+OutlineView.swift"; sourceTree = "<group>"; };
+		F1A0000000000000000000D7 /* SidebarViewController+ContextMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarViewController+ContextMenu.swift"; sourceTree = "<group>"; };
 		BB000000000000000000002E /* KeybindingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeybindingsViewController.swift; sourceTree = "<group>"; };
 		BB000000000000000000002F /* BatchRenameRule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchRenameRule.swift; sourceTree = "<group>"; };
 		BB0000000000000000000030 /* BatchRenamePreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchRenamePreset.swift; sourceTree = "<group>"; };
@@ -326,6 +337,9 @@
 		BB0000000000000000000044 /* AppearanceSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsViewController.swift; sourceTree = "<group>"; };
 		BB0000000000000000000045 /* KeyRecorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyRecorderView.swift; sourceTree = "<group>"; };
 		BB0000000000000000000046 /* BookmarksSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarksSettingsViewController.swift; sourceTree = "<group>"; };
+		F1A0000000000000000000D1 /* BookmarksSettingsViewController+TableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BookmarksSettingsViewController+TableView.swift"; sourceTree = "<group>"; };
+		F1A0000000000000000000D2 /* BookmarksSettingsViewController+DragReorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BookmarksSettingsViewController+DragReorder.swift"; sourceTree = "<group>"; };
+		F1A0000000000000000000D3 /* BookmarksSettingsViewController+AlertDialogs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BookmarksSettingsViewController+AlertDialogs.swift"; sourceTree = "<group>"; };
 		BB0000000000000000000047 /* AdvancedSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvancedSettingsViewController.swift; sourceTree = "<group>"; };
 		BB0000000000000000000048 /* StarSparkleAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarSparkleAnimator.swift; sourceTree = "<group>"; };
 		BB0000000000000000000049 /* AnimationEffectSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationEffectSettings.swift; sourceTree = "<group>"; };
@@ -774,6 +788,8 @@
 			isa = PBXGroup;
 			children = (
 				BB000000000000000000002D /* SidebarViewController.swift */,
+				F1A0000000000000000000D6 /* SidebarViewController+OutlineView.swift */,
+				F1A0000000000000000000D7 /* SidebarViewController+ContextMenu.swift */,
 			);
 			path = Sidebar;
 			sourceTree = "<group>";
@@ -786,8 +802,13 @@
 				BB0000000000000000000044 /* AppearanceSettingsViewController.swift */,
 				BB0000000000000000000045 /* KeyRecorderView.swift */,
 				BB0000000000000000000046 /* BookmarksSettingsViewController.swift */,
+				F1A0000000000000000000D1 /* BookmarksSettingsViewController+TableView.swift */,
+				F1A0000000000000000000D2 /* BookmarksSettingsViewController+DragReorder.swift */,
+				F1A0000000000000000000D3 /* BookmarksSettingsViewController+AlertDialogs.swift */,
 				BB0000000000000000000047 /* AdvancedSettingsViewController.swift */,
 				B3D9FF421A39B5F75121AF11 /* NetworkSyncSettingsViewController.swift */,
+				F1A0000000000000000000D4 /* NetworkSyncSettingsViewController+TableView.swift */,
+				F1A0000000000000000000D5 /* NetworkSyncSettingsViewController+Controls.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -1171,6 +1192,8 @@
 				CC0000000000000000000026 /* SpotlightSearchService.swift in Sources */,
 				CC0000000000000000000029 /* SidebarViewModel.swift in Sources */,
 				CC000000000000000000002A /* SidebarViewController.swift in Sources */,
+				F1B0000000000000000000D6 /* SidebarViewController+OutlineView.swift in Sources */,
+				F1B0000000000000000000D7 /* SidebarViewController+ContextMenu.swift in Sources */,
 				CC000000000000000000002B /* KeybindingsViewController.swift in Sources */,
 				CC000000000000000000002C /* BatchRenameRule.swift in Sources */,
 				CC000000000000000000002D /* BatchRenamePreset.swift in Sources */,
@@ -1196,6 +1219,9 @@
 				CC0000000000000000000041 /* AppearanceSettingsViewController.swift in Sources */,
 				CC0000000000000000000042 /* KeyRecorderView.swift in Sources */,
 				CC0000000000000000000043 /* BookmarksSettingsViewController.swift in Sources */,
+				F1B0000000000000000000D1 /* BookmarksSettingsViewController+TableView.swift in Sources */,
+				F1B0000000000000000000D2 /* BookmarksSettingsViewController+DragReorder.swift in Sources */,
+				F1B0000000000000000000D3 /* BookmarksSettingsViewController+AlertDialogs.swift in Sources */,
 				CC0000000000000000000044 /* AdvancedSettingsViewController.swift in Sources */,
 				CC0000000000000000000045 /* StarSparkleAnimator.swift in Sources */,
 				CC0000000000000000000046 /* AnimationEffectSettings.swift in Sources */,
@@ -1240,6 +1266,8 @@
 				F016B2D6D61C5A95006BC61B /* NetworkSyncConfig.swift in Sources */,
 				9975337F833EC3A3DE4C5BED /* NetworkSyncViewModel.swift in Sources */,
 				83A78FA84F9450863E849779 /* NetworkSyncSettingsViewController.swift in Sources */,
+				F1B0000000000000000000D4 /* NetworkSyncSettingsViewController+TableView.swift in Sources */,
+				F1B0000000000000000000D5 /* NetworkSyncSettingsViewController+Controls.swift in Sources */,
 				626F8E19260923924729104A /* SyncStatusBarController.swift in Sources */,
 				8A7EF9C9701927D028330EA9 /* SyncStatusPopoverViewController.swift in Sources */,
 				800C98774A959EE8EA064FB5 /* NetworkSyncModels.swift in Sources */,

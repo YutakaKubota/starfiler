@@ -7,7 +7,7 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource, NS
         case unpinPinnedItem
     }
 
-    private final class BookmarkTreeNode: NSObject {
+    final class BookmarkTreeNode: NSObject {
         let entry: SidebarViewModel.SidebarEntry
         let children: [BookmarkTreeNode]
 
@@ -20,25 +20,25 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource, NS
     private let viewModel: SidebarViewModel
     private let windowControlsContainer = NSView()
     private let windowControlsStackView = NSStackView()
-    private let scrollView = NSScrollView()
-    private let outlineView = NSOutlineView()
-    private let regularContextMenu = NSMenu()
+    let scrollView = NSScrollView()
+    let outlineView = NSOutlineView()
+    let regularContextMenu = NSMenu()
     private let recentSeparatorView = NSView()
     private let recentHeaderLabel = NSTextField(labelWithString: "History")
     private let recentScrollView = NSScrollView()
-    private let recentOutlineView = NSOutlineView()
+    let recentOutlineView = NSOutlineView()
     private var scrollViewBottomToRecent: NSLayoutConstraint!
     private var scrollViewBottomToView: NSLayoutConstraint!
     private var windowControlsHeightConstraint: NSLayoutConstraint!
     private var recentScrollViewHeightConstraint: NSLayoutConstraint!
 
-    private var regularSections: [SidebarViewModel.SidebarSection] = []
-    private var bookmarkRootsBySectionTitle: [String: [BookmarkTreeNode]] = [:]
-    private var recentSection: SidebarViewModel.SidebarSection?
-    private var contextMenuTarget: (section: SidebarViewModel.SidebarSection, entry: SidebarViewModel.SidebarEntry)?
+    var regularSections: [SidebarViewModel.SidebarSection] = []
+    var bookmarkRootsBySectionTitle: [String: [BookmarkTreeNode]] = [:]
+    var recentSection: SidebarViewModel.SidebarSection?
+    var contextMenuTarget: (section: SidebarViewModel.SidebarSection, entry: SidebarViewModel.SidebarEntry)?
 
-    private let sectionHeaderHeight: CGFloat = 22
-    private let entryRowHeight: CGFloat = 24
+    let sectionHeaderHeight: CGFloat = 22
+    let entryRowHeight: CGFloat = 24
     private let windowControlsTopInset: CGFloat = 6
     private let windowControlsBottomInset: CGFloat = 4
     private let windowControlsLeadingInset: CGFloat = 14
@@ -84,7 +84,7 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource, NS
         updateRecentSectionLayout()
     }
 
-    private var currentTheme: FilerTheme = .system
+    var currentTheme: FilerTheme = .system
 
     func reloadData() {
         viewModel.reloadSections()
@@ -340,7 +340,7 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource, NS
         }
     }
 
-    private func supportsHierarchicalDisplay(for sectionKind: SidebarViewModel.SectionKind) -> Bool {
+    func supportsHierarchicalDisplay(for sectionKind: SidebarViewModel.SectionKind) -> Bool {
         switch sectionKind {
         case .favorites, .bookmarkGroup:
             return true
@@ -567,7 +567,7 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource, NS
         onNavigateRequested?(url)
     }
 
-    private func sidebarEntry(from item: Any?) -> SidebarViewModel.SidebarEntry? {
+    func sidebarEntry(from item: Any?) -> SidebarViewModel.SidebarEntry? {
         if let entry = item as? SidebarViewModel.SidebarEntry {
             return entry
         }
@@ -579,7 +579,7 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource, NS
         return nil
     }
 
-    private func regularSection(for item: Any?, in outlineView: NSOutlineView) -> SidebarViewModel.SidebarSection? {
+    func regularSection(for item: Any?, in outlineView: NSOutlineView) -> SidebarViewModel.SidebarSection? {
         guard let item, let sectionTitle = sectionTitle(for: item, in: outlineView) else {
             return nil
         }
@@ -597,342 +597,5 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource, NS
         }
 
         return nil
-    }
-
-    // MARK: - NSOutlineViewDataSource
-
-    func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
-        if outlineView === recentOutlineView {
-            if item == nil {
-                return recentSection?.items.count ?? 0
-            }
-            return 0
-        }
-
-        if item == nil {
-            return regularSections.count
-        }
-
-        if let sectionTitle = item as? String,
-           let section = regularSections.first(where: { $0.title == sectionTitle }) {
-            if supportsHierarchicalDisplay(for: section.kind) {
-                return bookmarkRootsBySectionTitle[sectionTitle]?.count ?? 0
-            }
-            return section.items.count
-        }
-
-        if let node = item as? BookmarkTreeNode {
-            return node.children.count
-        }
-
-        return 0
-    }
-
-    func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
-        if outlineView === recentOutlineView {
-            return recentSection?.items[index] ?? ""
-        }
-
-        if item == nil {
-            return regularSections[index].title
-        }
-
-        if let sectionTitle = item as? String,
-           let section = regularSections.first(where: { $0.title == sectionTitle }) {
-            if supportsHierarchicalDisplay(for: section.kind) {
-                return bookmarkRootsBySectionTitle[sectionTitle]?[index] ?? ""
-            }
-            return section.items[index]
-        }
-
-        if let node = item as? BookmarkTreeNode {
-            return node.children[index]
-        }
-
-        return ""
-    }
-
-    func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
-        if outlineView === recentOutlineView {
-            return false
-        }
-        if item is String {
-            return true
-        }
-        if let node = item as? BookmarkTreeNode {
-            return !node.children.isEmpty
-        }
-        return false
-    }
-
-    // MARK: - NSOutlineViewDelegate
-
-    func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
-        if let sectionTitle = item as? String {
-            return makeSectionHeaderView(title: sectionTitle, in: outlineView)
-        }
-
-        if let entry = item as? SidebarViewModel.SidebarEntry {
-            return makeEntryView(entry: entry, in: outlineView)
-        }
-
-        if let node = item as? BookmarkTreeNode {
-            return makeEntryView(entry: node.entry, in: outlineView)
-        }
-
-        return nil
-    }
-
-    func outlineView(_ outlineView: NSOutlineView, isGroupItem item: Any) -> Bool {
-        if outlineView === recentOutlineView {
-            return false
-        }
-        return item is String
-    }
-
-    func outlineView(_ outlineView: NSOutlineView, shouldSelectItem item: Any) -> Bool {
-        item is SidebarViewModel.SidebarEntry || item is BookmarkTreeNode
-    }
-
-    func outlineView(_ outlineView: NSOutlineView, heightOfRowByItem item: Any) -> CGFloat {
-        if outlineView === recentOutlineView {
-            return entryRowHeight
-        }
-
-        if item is String {
-            return sectionHeaderHeight
-        }
-        return entryRowHeight
-    }
-
-    // MARK: - Cell Views
-
-    private func makeSectionHeaderView(title: String, in outlineView: NSOutlineView) -> NSView {
-        let cellIdentifier = NSUserInterfaceItemIdentifier("sectionHeader")
-        let palette = currentTheme.palette
-        let isFavorites = isFavoritesSectionTitle(title)
-
-        if let existing = outlineView.makeView(withIdentifier: cellIdentifier, owner: self) as? NSTableCellView {
-            existing.textField?.stringValue = title
-            existing.textField?.textColor = palette.sidebarSectionHeaderColor
-            if let starView = existing.viewWithTag(200) as? NSImageView {
-                starView.isHidden = !isFavorites
-                starView.contentTintColor = palette.starAccentColor
-            }
-            return existing
-        }
-
-        let cell = NSTableCellView()
-        cell.identifier = cellIdentifier
-
-        let starImageView = NSImageView()
-        starImageView.translatesAutoresizingMaskIntoConstraints = false
-        starImageView.image = NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil)
-        starImageView.contentTintColor = palette.starAccentColor
-        starImageView.tag = 200
-        starImageView.isHidden = !isFavorites
-
-        let textField = NSTextField(labelWithString: title)
-        textField.translatesAutoresizingMaskIntoConstraints = false
-        textField.font = .systemFont(ofSize: 11, weight: .bold)
-        textField.textColor = palette.sidebarSectionHeaderColor
-
-        cell.textField = textField
-        cell.addSubview(starImageView)
-        cell.addSubview(textField)
-
-        NSLayoutConstraint.activate([
-            starImageView.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
-            starImageView.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-            starImageView.widthAnchor.constraint(equalToConstant: 12),
-            starImageView.heightAnchor.constraint(equalToConstant: 12),
-
-            textField.leadingAnchor.constraint(equalTo: starImageView.trailingAnchor, constant: 4),
-            textField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4),
-            textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-        ])
-
-        return cell
-    }
-
-    private func isFavoritesSectionTitle(_ title: String) -> Bool {
-        guard let section = regularSections.first(where: { $0.title == title }) else {
-            return false
-        }
-        if case .favorites = section.kind {
-            return true
-        }
-        return false
-    }
-
-    private func makeEntryView(entry: SidebarViewModel.SidebarEntry, in outlineView: NSOutlineView) -> NSView {
-        let cellIdentifier = NSUserInterfaceItemIdentifier("entryCell")
-        let cell: NSTableCellView
-        let shortcutLabel: NSTextField
-        let highlightBar: NSView
-
-        let shortcutIdentifier = NSUserInterfaceItemIdentifier("shortcutLabel")
-        let barIdentifier = NSUserInterfaceItemIdentifier("highlightBar")
-
-        if let existing = outlineView.makeView(withIdentifier: cellIdentifier, owner: self) as? NSTableCellView,
-           let existingShortcut = existing.subviews.first(where: { $0.identifier == shortcutIdentifier }) as? NSTextField,
-           let existingBar = existing.subviews.first(where: { $0.identifier == barIdentifier }) {
-            cell = existing
-            shortcutLabel = existingShortcut
-            highlightBar = existingBar
-        } else {
-            cell = NSTableCellView()
-            cell.identifier = cellIdentifier
-
-            highlightBar = NSView()
-            highlightBar.translatesAutoresizingMaskIntoConstraints = false
-            highlightBar.wantsLayer = true
-            highlightBar.identifier = barIdentifier
-
-            let imageView = NSImageView()
-            imageView.translatesAutoresizingMaskIntoConstraints = false
-            imageView.imageScaling = .scaleProportionallyDown
-
-            let textField = NSTextField(labelWithString: "")
-            textField.translatesAutoresizingMaskIntoConstraints = false
-            textField.lineBreakMode = .byTruncatingTail
-            textField.font = .systemFont(ofSize: 13)
-
-            shortcutLabel = NSTextField(labelWithString: "")
-            shortcutLabel.translatesAutoresizingMaskIntoConstraints = false
-            shortcutLabel.font = .monospacedSystemFont(ofSize: 10, weight: .regular)
-            shortcutLabel.textColor = .tertiaryLabelColor
-            shortcutLabel.alignment = .right
-            shortcutLabel.identifier = shortcutIdentifier
-            shortcutLabel.setContentHuggingPriority(.required, for: .horizontal)
-            shortcutLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
-
-            cell.imageView = imageView
-            cell.textField = textField
-            cell.addSubview(highlightBar)
-            cell.addSubview(imageView)
-            cell.addSubview(textField)
-            cell.addSubview(shortcutLabel)
-
-            NSLayoutConstraint.activate([
-                highlightBar.leadingAnchor.constraint(equalTo: cell.leadingAnchor),
-                highlightBar.topAnchor.constraint(equalTo: cell.topAnchor, constant: 2),
-                highlightBar.bottomAnchor.constraint(equalTo: cell.bottomAnchor, constant: -2),
-                highlightBar.widthAnchor.constraint(equalToConstant: 3),
-
-                imageView.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
-                imageView.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-                imageView.widthAnchor.constraint(equalToConstant: 16),
-                imageView.heightAnchor.constraint(equalToConstant: 16),
-
-                textField.leadingAnchor.constraint(equalTo: imageView.trailingAnchor, constant: 6),
-                textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-
-                shortcutLabel.leadingAnchor.constraint(greaterThanOrEqualTo: textField.trailingAnchor, constant: 4),
-                shortcutLabel.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4),
-                shortcutLabel.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-            ])
-        }
-
-        let palette = currentTheme.palette
-        cell.textField?.stringValue = entry.displayName
-        cell.imageView?.image = NSImage(systemSymbolName: entry.iconName, accessibilityDescription: nil)
-            ?? NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
-
-        highlightBar.isHidden = true
-        if entry.isCurrentPosition {
-            cell.textField?.font = .systemFont(ofSize: 13, weight: .semibold)
-            cell.textField?.textColor = palette.starAccentColor
-            cell.imageView?.contentTintColor = palette.starAccentColor
-        } else {
-            cell.textField?.font = .systemFont(ofSize: 13)
-            cell.textField?.textColor = palette.sidebarEntryTextColor
-            cell.imageView?.contentTintColor = palette.sidebarIconTintColor
-        }
-
-        shortcutLabel.stringValue = entry.shortcutHint ?? ""
-        shortcutLabel.isHidden = entry.shortcutHint == nil
-        shortcutLabel.textColor = palette.sidebarShortcutHintColor
-
-        return cell
-    }
-
-    // MARK: - Context Menu
-
-    func menuNeedsUpdate(_ menu: NSMenu) {
-        guard menu === regularContextMenu else {
-            return
-        }
-
-        menu.removeAllItems()
-        contextMenuTarget = nil
-
-        let clickedRow = outlineView.clickedRow
-        guard clickedRow >= 0 else {
-            return
-        }
-
-        let item = outlineView.item(atRow: clickedRow)
-        guard let entry = sidebarEntry(from: item),
-              let section = regularSection(for: item, in: outlineView),
-              supportsContextMenu(for: section.kind) else {
-            return
-        }
-
-        outlineView.selectRowIndexes(IndexSet(integer: clickedRow), byExtendingSelection: false)
-        contextMenuTarget = (section, entry)
-
-        switch section.kind {
-        case .favorites, .bookmarkGroup:
-            let editItem = NSMenuItem(title: "Edit Bookmark…", action: #selector(handleEditBookmarkFromContextMenu(_:)), keyEquivalent: "")
-            editItem.target = self
-            menu.addItem(editItem)
-
-            let deleteItem = NSMenuItem(title: "Delete Bookmark", action: #selector(handleDeleteBookmarkFromContextMenu(_:)), keyEquivalent: "")
-            deleteItem.target = self
-            menu.addItem(deleteItem)
-        case .pinned:
-            let unpinItem = NSMenuItem(title: "Unpin", action: #selector(handleUnpinPinnedItemFromContextMenu(_:)), keyEquivalent: "")
-            unpinItem.target = self
-            menu.addItem(unpinItem)
-        case .recent:
-            return
-        }
-    }
-
-    private func supportsContextMenu(for sectionKind: SidebarViewModel.SectionKind) -> Bool {
-        switch sectionKind {
-        case .favorites, .bookmarkGroup, .pinned:
-            return true
-        case .recent:
-            return false
-        }
-    }
-
-    @objc
-    private func handleEditBookmarkFromContextMenu(_ sender: Any?) {
-        guard let contextMenuTarget else {
-            return
-        }
-
-        onBookmarkContextActionRequested?(.editBookmark, contextMenuTarget.section.kind, contextMenuTarget.entry)
-    }
-
-    @objc
-    private func handleDeleteBookmarkFromContextMenu(_ sender: Any?) {
-        guard let contextMenuTarget else {
-            return
-        }
-
-        onBookmarkContextActionRequested?(.deleteBookmark, contextMenuTarget.section.kind, contextMenuTarget.entry)
-    }
-
-    @objc
-    private func handleUnpinPinnedItemFromContextMenu(_ sender: Any?) {
-        guard let contextMenuTarget else {
-            return
-        }
-
-        onBookmarkContextActionRequested?(.unpinPinnedItem, contextMenuTarget.section.kind, contextMenuTarget.entry)
     }
 }
