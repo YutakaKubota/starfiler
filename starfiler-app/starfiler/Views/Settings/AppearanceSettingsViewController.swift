@@ -236,49 +236,69 @@ final class AppearanceSettingsViewController: NSViewController {
     }
 
     private func configureLayout() {
-        view.addSubview(titleLabel)
-        view.addSubview(themePopUpButton)
-        view.addSubview(descriptionLabel)
-        view.addSubview(swatchContainer)
-        view.addSubview(transparentBackgroundButton)
-        view.addSubview(transparentOpacityLabel)
-        view.addSubview(transparentOpacitySlider)
-        view.addSubview(transparentOpacityValueLabel)
-        view.addSubview(actionFeedbackButton)
-        view.addSubview(shortcutGuideButton)
-        view.addSubview(starEffectsButton)
+        let contentView = NSView()
+        contentView.translatesAutoresizingMaskIntoConstraints = false
+
+        contentView.addSubview(titleLabel)
+        contentView.addSubview(themePopUpButton)
+        contentView.addSubview(descriptionLabel)
+        contentView.addSubview(swatchContainer)
+        contentView.addSubview(transparentBackgroundButton)
+        contentView.addSubview(transparentOpacityLabel)
+        contentView.addSubview(transparentOpacitySlider)
+        contentView.addSubview(transparentOpacityValueLabel)
+        contentView.addSubview(actionFeedbackButton)
+        contentView.addSubview(shortcutGuideButton)
+        contentView.addSubview(starEffectsButton)
 
         for (_, button) in effectButtons {
-            view.addSubview(button)
+            contentView.addSubview(button)
         }
-        view.addSubview(shootingStarTestButton)
+        contentView.addSubview(shootingStarTestButton)
 
-        view.addSubview(fileListSettingsLabel)
-        view.addSubview(fileIconSizeLabel)
-        view.addSubview(fileIconSizeSlider)
-        view.addSubview(fileIconSizeValueLabel)
-        view.addSubview(sidebarFavoritesVisibilityButton)
-        view.addSubview(sidebarRecentItemsLimitLabel)
-        view.addSubview(sidebarRecentItemsLimitSlider)
-        view.addSubview(sidebarRecentItemsLimitValueLabel)
-        view.addSubview(searchSettingsLabel)
-        view.addSubview(spotlightScopePopUpButton)
-        view.addSubview(spotlightScopeDescriptionLabel)
+        contentView.addSubview(fileListSettingsLabel)
+        contentView.addSubview(fileIconSizeLabel)
+        contentView.addSubview(fileIconSizeSlider)
+        contentView.addSubview(fileIconSizeValueLabel)
+        contentView.addSubview(sidebarFavoritesVisibilityButton)
+        contentView.addSubview(sidebarRecentItemsLimitLabel)
+        contentView.addSubview(sidebarRecentItemsLimitSlider)
+        contentView.addSubview(sidebarRecentItemsLimitValueLabel)
+        contentView.addSubview(searchSettingsLabel)
+        contentView.addSubview(spotlightScopePopUpButton)
+        contentView.addSubview(spotlightScopeDescriptionLabel)
+
+        let scrollView = NSScrollView()
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.drawsBackground = false
+        scrollView.hasVerticalScroller = true
+        scrollView.documentView = contentView
+        view.addSubview(scrollView)
 
         var constraints = [
-            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            titleLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 20),
+            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            contentView.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
+            contentView.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
+            contentView.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor),
+
+            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
 
             themePopUpButton.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
             themePopUpButton.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 10),
             themePopUpButton.widthAnchor.constraint(equalToConstant: 220),
 
             descriptionLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
-            descriptionLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            descriptionLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             descriptionLabel.topAnchor.constraint(equalTo: themePopUpButton.bottomAnchor, constant: 10),
 
             swatchContainer.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
-            swatchContainer.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -20),
+            swatchContainer.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -20),
             swatchContainer.topAnchor.constraint(equalTo: descriptionLabel.bottomAnchor, constant: 14),
             swatchContainer.heightAnchor.constraint(equalToConstant: 28),
 
@@ -307,7 +327,7 @@ final class AppearanceSettingsViewController: NSViewController {
 
             shootingStarTestButton.leadingAnchor.constraint(greaterThanOrEqualTo: starEffectsButton.trailingAnchor, constant: 12),
             shootingStarTestButton.centerYAnchor.constraint(equalTo: starEffectsButton.centerYAnchor),
-            shootingStarTestButton.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -20),
+            shootingStarTestButton.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -20),
         ]
 
         // Effect toggle buttons: indented under the master star effects button
@@ -355,8 +375,11 @@ final class AppearanceSettingsViewController: NSViewController {
             spotlightScopePopUpButton.widthAnchor.constraint(equalToConstant: 220),
 
             spotlightScopeDescriptionLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
-            spotlightScopeDescriptionLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            spotlightScopeDescriptionLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             spotlightScopeDescriptionLabel.topAnchor.constraint(equalTo: spotlightScopePopUpButton.bottomAnchor, constant: 8),
+
+            // Bottom anchor to define scrollable content height
+            spotlightScopeDescriptionLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
         ])
 
         NSLayoutConstraint.activate(constraints)
