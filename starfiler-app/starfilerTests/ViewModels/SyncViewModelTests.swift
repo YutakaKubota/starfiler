@@ -572,6 +572,67 @@ final class SyncViewModelTests: XCTestCase {
         XCTAssertTrue(sut.selectiveSyncActivityText.contains("Last updated:"))
     }
 
+    func testNetworkSyncViewModelBuildsMenuBarSummaryForSelectedActiveTransfers() async throws {
+        let rootURL = tempConfigDir.appendingPathComponent("NetworkSyncMenuBarRoot", isDirectory: true)
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+
+        let config = NetworkSyncConfig(
+            clientEnabled: true,
+            clientRootPath: rootURL.path,
+            clientSyncEntireRoot: false,
+            clientIncludedPaths: ["docs", "photos/cover.jpg"]
+        )
+        try configManager.saveNetworkSyncConfig(config)
+
+        let service = MockNetworkSyncController()
+        let sut = NetworkSyncViewModel(configManager: configManager, service: service)
+
+        service.emit(
+            NetworkSyncRuntimeSnapshot(
+                status: .syncing,
+                detail: "Syncing",
+                peers: [],
+                conflicts: [],
+                transfers: [],
+                activeTransfers: [
+                    "docs/report.txt": .download,
+                    "photos/cover.jpg": .upload,
+                    "tmp/ignored.txt": .download,
+                ],
+                browserStateVersion: 0
+            )
+        )
+
+        await waitForCondition(description: "Menu bar summary reflects selected active transfers") {
+            sut.menuBarLabel == "Sync 2" &&
+                sut.menuBarDetail == "Selected Sync: 2 active (1 downloading, 1 uploading) - docs/report.txt, photos/cover.jpg"
+        }
+
+        XCTAssertEqual(sut.menuBarLabel, "Sync 2")
+        XCTAssertEqual(
+            sut.menuBarDetail,
+            "Selected Sync: 2 active (1 downloading, 1 uploading) - docs/report.txt, photos/cover.jpg"
+        )
+    }
+
+    func testNetworkSyncViewModelBuildsMenuBarIdleSummaryForSelectiveSync() async throws {
+        let rootURL = tempConfigDir.appendingPathComponent("NetworkSyncMenuBarIdleRoot", isDirectory: true)
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+
+        let config = NetworkSyncConfig(
+            clientEnabled: true,
+            clientRootPath: rootURL.path,
+            clientSyncEntireRoot: false,
+            clientIncludedPaths: ["docs", "photos"]
+        )
+        try configManager.saveNetworkSyncConfig(config)
+
+        let sut = NetworkSyncViewModel(configManager: configManager, service: MockNetworkSyncController())
+
+        XCTAssertNil(sut.menuBarLabel)
+        XCTAssertEqual(sut.menuBarDetail, "Selected Sync: Idle (2 path(s) selected)")
+    }
+
     func testNetworkSyncSettingsViewControllerPreservesCollapsedOutlineStateAcrossUpdates() async throws {
         let rootURL = tempConfigDir.appendingPathComponent("NetworkSyncOutlineRoot", isDirectory: true)
         try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)

@@ -63,6 +63,8 @@ protocol SyncStatusBarPresenting: AnyObject {
     var statusLevel: SyncStatusLevel { get }
     var statusTitle: String { get }
     var statusDetail: String? { get }
+    var menuBarLabel: String? { get }
+    var menuBarDetail: String? { get }
     var peers: [SyncPeerSummary] { get }
     var conflicts: [SyncConflictSummary] { get }
     var recentTransfers: [SyncTransferSummary] { get }
@@ -71,6 +73,11 @@ protocol SyncStatusBarPresenting: AnyObject {
     func requestRefresh()
     @discardableResult func addDidChangeObserver(_ observer: @escaping @MainActor () -> Void) -> UUID
     func removeDidChangeObserver(_ token: UUID)
+}
+
+extension SyncStatusBarPresenting {
+    var menuBarLabel: String? { nil }
+    var menuBarDetail: String? { statusDetail }
 }
 
 @MainActor
@@ -131,11 +138,10 @@ final class SyncStatusBarController: NSObject {
 
         button.target = self
         button.action = #selector(togglePopover(_:))
-        button.imagePosition = .imageOnly
         button.isBordered = false
         button.image = Self.makeSymbolImage(named: viewModel.statusLevel.symbolName)
-        button.toolTip = tooltipText()
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        updateStatusItem(button)
     }
 
     private func configurePopover() {
@@ -189,11 +195,19 @@ final class SyncStatusBarController: NSObject {
         }
 
         button.image = Self.makeSymbolImage(named: viewModel.statusLevel.symbolName)
+        updateStatusItem(button)
+    }
+
+    private func updateStatusItem(_ button: NSStatusBarButton) {
+        let title = viewModel.menuBarLabel?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        button.title = title
+        button.imagePosition = title.isEmpty ? .imageOnly : .imageLeading
         button.toolTip = tooltipText()
     }
 
     private func tooltipText() -> String {
-        let detail = viewModel.statusDetail.map { " - \($0)" } ?? ""
+        let detailSource = viewModel.menuBarDetail ?? viewModel.statusDetail
+        let detail = detailSource.map { " - \($0)" } ?? ""
         return "\(viewModel.statusTitle)\(detail)"
     }
 

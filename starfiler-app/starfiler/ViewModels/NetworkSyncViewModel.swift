@@ -126,6 +126,57 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         return "Enable the client role to load folders and files."
     }
 
+    var menuBarLabel: String? {
+        let selectedTransfers = selectedActiveTransfers()
+        guard !selectedTransfers.isEmpty else {
+            let selectedConflictCount = selectedConflicts().count
+            return selectedConflictCount > 0 ? "Issue \(selectedConflictCount)" : nil
+        }
+
+        let uploadCount = selectedTransfers.values.filter { $0 == .upload }.count
+        let downloadCount = selectedTransfers.values.filter { $0 == .download }.count
+        if uploadCount > 0 && downloadCount > 0 {
+            return "Sync \(selectedTransfers.count)"
+        }
+        if downloadCount > 0 {
+            return "Down \(downloadCount)"
+        }
+        return "Up \(uploadCount)"
+    }
+
+    var menuBarDetail: String? {
+        guard clientEnabled, !clientSyncEntireRoot else {
+            return statusDetail
+        }
+
+        let selectedPaths = currentIncludedPaths()
+        guard !selectedPaths.isEmpty else {
+            return statusDetail
+        }
+
+        let selectedTransfers = selectedActiveTransfers()
+        if !selectedTransfers.isEmpty {
+            let summary = summarizedPaths(Array(selectedTransfers.keys).sorted())
+            let uploadCount = selectedTransfers.values.filter { $0 == .upload }.count
+            let downloadCount = selectedTransfers.values.filter { $0 == .download }.count
+
+            if uploadCount > 0 && downloadCount > 0 {
+                return "Selected Sync: \(selectedTransfers.count) active (\(downloadCount) downloading, \(uploadCount) uploading) - \(summary)"
+            }
+            if downloadCount > 0 {
+                return "Selected Sync: Downloading \(summary)"
+            }
+            return "Selected Sync: Uploading \(summary)"
+        }
+
+        let selectedConflictItems = selectedConflicts()
+        if !selectedConflictItems.isEmpty {
+            return "Selected Sync: \(selectedConflictItems.count) item(s) need attention - \(summarizedPaths(selectedConflictItems.map(\.relativePath)))"
+        }
+
+        return "Selected Sync: Idle (\(selectedPaths.count) path(s) selected)"
+    }
+
     var isEnabled: Bool {
         serverEnabled || clientEnabled
     }
@@ -749,6 +800,37 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
             let normalized = normalizeRelativePath(candidatePath)
             return normalized == path || normalized.hasPrefix(path + "/")
         }?.value
+    }
+
+    private func selectedActiveTransfers() -> [String: NetworkSyncTransferActivity] {
+        guard clientEnabled, !clientSyncEntireRoot else {
+            return [:]
+        }
+        return activeTransfers.reduce(into: [:]) { result, entry in
+            if pathIsSelected(entry.key) {
+                result[normalizeRelativePath(entry.key)] = entry.value
+            }
+        }
+    }
+
+    private func selectedConflicts() -> [SyncConflictSummary] {
+        guard clientEnabled, !clientSyncEntireRoot else {
+            return []
+        }
+        return conflicts.filter { pathIsSelected($0.relativePath) }
+    }
+
+    private func summarizedPaths(_ paths: [String], limit: Int = 2) -> String {
+        let normalized = paths
+            .map(normalizeRelativePath)
+            .filter { !$0.isEmpty }
+        guard !normalized.isEmpty else {
+            return "selected items"
+        }
+
+        let visible = normalized.prefix(limit)
+        let suffix = normalized.count > limit ? " +\(normalized.count - limit) more" : ""
+        return visible.joined(separator: ", ") + suffix
     }
 
     private func deselect(path: String, selectedPaths: inout Set<String>, roots: [SelectiveSyncBrowserNode]) {
