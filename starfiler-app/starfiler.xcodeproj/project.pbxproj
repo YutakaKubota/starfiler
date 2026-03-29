@@ -35,6 +35,7 @@
 		CC0000000000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000001 /* AppDelegate.swift */; };
 		CC00000000000000000000A1 /* AppDelegate+MainMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000A1 /* AppDelegate+MainMenu.swift */; };
 		CC00000000000000000000A2 /* AppDelegate+SettingsWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000A2 /* AppDelegate+SettingsWindow.swift */; };
+		CC00000000000000000000A3 /* MainMenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000A3 /* MainMenuBuilder.swift */; };
 		CC0000000000000000000002 /* MainWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000002 /* MainWindowController.swift */; };
 		CC0000000000000000000087 /* MainWindowController+ConfigMonitoring.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000087 /* MainWindowController+ConfigMonitoring.swift */; };
 		CC0000000000000000000088 /* MainWindowController+TerminalSessions.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000088 /* MainWindowController+TerminalSessions.swift */; };
@@ -123,6 +124,7 @@
 		CC0000000000000000000049 /* markdown-preview.html in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000004C /* markdown-preview.html */; };
 		CC000000000000000000004A /* TerminalSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000004D /* TerminalSession.swift */; };
 		CC000000000000000000004B /* TerminalSessionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000004E /* TerminalSessionService.swift */; };
+		CC00000000000000000000C1 /* ExternalSessionDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000C1 /* ExternalSessionDiscovery.swift */; };
 		CC000000000000000000004C /* TerminalSessionListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000004F /* TerminalSessionListViewModel.swift */; };
 		CC000000000000000000004D /* TerminalSessionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000050 /* TerminalSessionViewModel.swift */; };
 		CC000000000000000000004E /* TerminalContentViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000051 /* TerminalContentViewController.swift */; };
@@ -236,6 +238,7 @@
 		BB0000000000000000000001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		BB00000000000000000000A1 /* AppDelegate+MainMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+MainMenu.swift"; sourceTree = "<group>"; };
 		BB00000000000000000000A2 /* AppDelegate+SettingsWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+SettingsWindow.swift"; sourceTree = "<group>"; };
+		BB00000000000000000000A3 /* MainMenuBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainMenuBuilder.swift; sourceTree = "<group>"; };
 		BB0000000000000000000002 /* MainWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowController.swift; sourceTree = "<group>"; };
 		BB0000000000000000000087 /* MainWindowController+ConfigMonitoring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MainWindowController+ConfigMonitoring.swift"; sourceTree = "<group>"; };
 		BB0000000000000000000088 /* MainWindowController+TerminalSessions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MainWindowController+TerminalSessions.swift"; sourceTree = "<group>"; };
@@ -327,6 +330,7 @@
 		BB000000000000000000004C /* markdown-preview.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = "markdown-preview.html"; sourceTree = "<group>"; };
 		BB000000000000000000004D /* TerminalSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSession.swift; sourceTree = "<group>"; };
 		BB000000000000000000004E /* TerminalSessionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSessionService.swift; sourceTree = "<group>"; };
+		BB00000000000000000000C1 /* ExternalSessionDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalSessionDiscovery.swift; sourceTree = "<group>"; };
 		BB000000000000000000004F /* TerminalSessionListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSessionListViewModel.swift; sourceTree = "<group>"; };
 		BB0000000000000000000050 /* TerminalSessionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSessionViewModel.swift; sourceTree = "<group>"; };
 		BB0000000000000000000051 /* TerminalContentViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalContentViewController.swift; sourceTree = "<group>"; };
@@ -628,6 +632,7 @@
 				BB000000000000000000003E /* VisitHistoryService.swift */,
 				BB000000000000000000004A /* ApplicationRelatedItemLocatorService.swift */,
 				BB000000000000000000004E /* TerminalSessionService.swift */,
+				BB00000000000000000000C1 /* ExternalSessionDiscovery.swift */,
 				BB0000000000000000000074 /* PinnedItemsService.swift */,
 				9F923F3DA9120D6646AA700B /* Sync */,
 			);
@@ -1189,6 +1194,7 @@
 				CC0000000000000000000048 /* MarkdownPreviewPanelController.swift in Sources */,
 				CC000000000000000000004A /* TerminalSession.swift in Sources */,
 				CC000000000000000000004B /* TerminalSessionService.swift in Sources */,
+				CC00000000000000000000C1 /* ExternalSessionDiscovery.swift in Sources */,
 				CC000000000000000000004C /* TerminalSessionListViewModel.swift in Sources */,
 				CC000000000000000000004D /* TerminalSessionViewModel.swift in Sources */,
 				CC000000000000000000004E /* TerminalContentViewController.swift in Sources */,
