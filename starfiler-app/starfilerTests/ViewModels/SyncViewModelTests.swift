@@ -609,7 +609,13 @@ final class SyncViewModelTests: XCTestCase {
             return
         }
 
+        let docsNode = try XCTUnwrap(viewModel.selectiveSyncNodes.first(where: { $0.path == "docs" }))
         let imagesNode = try XCTUnwrap(viewModel.selectiveSyncNodes.first(where: { $0.path == "images" }))
+        XCTAssertFalse(outlineView.isItemExpanded(docsNode))
+        XCTAssertFalse(outlineView.isItemExpanded(imagesNode))
+
+        outlineView.expandItem(docsNode)
+        XCTAssertTrue(outlineView.isItemExpanded(docsNode))
         outlineView.collapseItem(imagesNode)
         XCTAssertFalse(outlineView.isItemExpanded(imagesNode))
 

@@ -455,12 +455,8 @@ final class NetworkSyncSettingsViewController: NSViewController {
         let expandedPaths = currentExpandedPaths(in: lastRenderedSelectiveSyncNodes)
         selectiveSyncOutlineView.reloadData()
 
-        if !hasPerformedInitialSelectiveSyncExpansion {
-            expandSelectiveSyncTree()
-            hasPerformedInitialSelectiveSyncExpansion = true
-        } else {
-            restoreExpandedPaths(expandedPaths, in: nextNodes)
-        }
+        restoreExpandedPaths(expandedPaths, in: nextNodes)
+        hasPerformedInitialSelectiveSyncExpansion = true
 
         lastRenderedSelectiveSyncNodes = nextNodes
     }
