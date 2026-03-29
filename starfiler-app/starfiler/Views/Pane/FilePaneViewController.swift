@@ -1,6 +1,4 @@
 import AppKit
-import AVFoundation
-import ImageIO
 
 private final class CenteredSearchFieldCell: NSSearchFieldCell {
     // Keep search text and placeholder vertically centered in compact header height.
@@ -156,12 +154,12 @@ private final class ShortcutGuidePopupView: NSView {
 }
 
 final class FilePaneViewController: NSViewController, NSTableViewDataSource, NSTableViewDelegate, NSCollectionViewDataSource, NSCollectionViewDelegate, NSCollectionViewDelegateFlowLayout, NSMenuDelegate, KeyActionDelegate, MediaKeyActionDelegate, NSTextFieldDelegate, NSSearchFieldDelegate {
-    private static let pixelmatorProAppURL = URL(
+    static let pixelmatorProAppURL = URL(
         fileURLWithPath: "/Applications/Pixelmator Pro.app",
         isDirectory: true
     )
 
-    private enum SearchMode: Int {
+    enum SearchMode: Int {
         case filter = 0
         case spotlight = 1
 
@@ -193,38 +191,38 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
         }
     }
 
-    private enum Column {
+    enum Column {
         static let name = NSUserInterfaceItemIdentifier("name")
         static let size = NSUserInterfaceItemIdentifier("size")
         static let modified = NSUserInterfaceItemIdentifier("modified")
     }
 
-    private enum Cell {
+    enum Cell {
         static let name = NSUserInterfaceItemIdentifier("nameCell")
         static let text = NSUserInterfaceItemIdentifier("textCell")
     }
 
-    private enum TreeDisclosureMetrics {
+    enum TreeDisclosureMetrics {
         static let leading = CGFloat(4)
         static let indentWidth = CGFloat(16)
         static let disclosureWidth = CGFloat(14)
     }
 
-    private enum ContextMenuMetrics {
+    enum ContextMenuMetrics {
         static let staticHeaderItemCount = 2
         static let filterWidth = CGFloat(280)
         static let filterHeight = CGFloat(30)
         static let filterFieldInset = CGFloat(8)
     }
 
-    private static let byteFormatter: ByteCountFormatter = {
+    static let byteFormatter: ByteCountFormatter = {
         let formatter = ByteCountFormatter()
         formatter.countStyle = .file
         return formatter
     }()
 
-    private static let browserModeIconSize: CGFloat = 16
-    private static let browserModeRowHeight: CGFloat = max(24, browserModeIconSize + 8)
+    static let browserModeIconSize: CGFloat = 16
+    static let browserModeRowHeight: CGFloat = max(24, browserModeIconSize + 8)
     private static let browserNameColumnDefaultWidth: CGFloat = 440
     private static let browserSizeColumnDefaultWidth: CGFloat = 120
     private static let browserModifiedColumnDefaultWidth: CGFloat = 180
@@ -247,14 +245,14 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
     private static let mediaIconSliderSpacing: CGFloat = 4
     private static let mediaIconLabelSpacing: CGFloat = 12
 
-    private static let dateFormatter: DateFormatter = {
+    static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy/MM/dd HH:mm"
         return formatter
     }()
 
-    private let viewModel: FilePaneViewModel
-    private var keybindingManager = KeybindingManager()
+    let viewModel: FilePaneViewModel
+    var keybindingManager = KeybindingManager()
     private let headerView = NSView()
     private let navigationStackView = NSStackView()
     private let breadcrumbContainerView = NSView()
@@ -266,20 +264,20 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
     private let mediaRecursiveButton = NSButton(checkboxWithTitle: "", target: nil, action: nil)
     private let mediaIconSizeSlider = NSSlider(value: 16, minValue: 12, maxValue: 40, target: nil, action: nil)
     private let mediaIconSizeValueLabel = NSTextField(labelWithString: "16 px")
-    private let searchField = NSSearchField()
-    private lazy var contextMenuFilterField: NSSearchField = makeContextMenuFilterField()
-    private let scrollView = NSScrollView()
+    let searchField = NSSearchField()
+    lazy var contextMenuFilterField: NSSearchField = makeContextMenuFilterField()
+    let scrollView = NSScrollView()
     private let bookmarkJumpOverlayView = BookmarkJumpOverlayView()
     private let shortcutGuidePopupView = ShortcutGuidePopupView()
     private let loadingOverlayView = NSVisualEffectView()
     private let loadingIndicator = NSProgressIndicator()
     private let loadingLabel = NSTextField(labelWithString: "")
-    private let tableView = FileTableView()
-    private let mediaCollectionLayout = NSCollectionViewFlowLayout()
-    private let mediaCollectionView = MediaCollectionView()
-    private let fileDragSource = FileDragSource()
+    let tableView = FileTableView()
+    let mediaCollectionLayout = NSCollectionViewFlowLayout()
+    let mediaCollectionView = MediaCollectionView()
+    let fileDragSource = FileDragSource()
 
-    private lazy var fileDropTarget = FileDropTarget(
+    lazy var fileDropTarget = FileDropTarget(
         destinationDirectoryProvider: { [weak self] in
             self?.viewModel.paneState.currentDirectory ?? UserPaths.homeDirectoryURL
         },
@@ -288,34 +286,34 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
         }
     )
 
-    private var isPaneActive = false
-    private var isDropTargetHighlighted = false
-    private var vimModeState = VimModeState()
-    private var filerTheme: FilerTheme = .system
-    private var backgroundOpacity: CGFloat = 1.0
-    private var fileIconSize: CGFloat = 16
-    private let iconCache = NSCache<NSString, NSImage>()
-    private let thumbnailCache = NSCache<NSString, NSImage>()
-    private var thumbnailTasks: [NSString: Task<Void, Never>] = [:]
-    private var currentSearchMode: SearchMode = .filter
-    private var searchMenuModeItems: [SearchMode: NSMenuItem] = [:]
-    private var searchMenuScopeItems: [SpotlightSearchScope: NSMenuItem] = [:]
-    private weak var activeContextMenu: NSMenu?
-    private var contextMenuFilterText = ""
-    private var currentDisplayMode: PaneDisplayMode = .browser
+    var isPaneActive = false
+    var isDropTargetHighlighted = false
+    var vimModeState = VimModeState()
+    var filerTheme: FilerTheme = .system
+    var backgroundOpacity: CGFloat = 1.0
+    var fileIconSize: CGFloat = 16
+    let iconCache = NSCache<NSString, NSImage>()
+    let thumbnailCache = NSCache<NSString, NSImage>()
+    var thumbnailTasks: [NSString: Task<Void, Never>] = [:]
+    var currentSearchMode: SearchMode = .filter
+    var searchMenuModeItems: [SearchMode: NSMenuItem] = [:]
+    var searchMenuScopeItems: [SpotlightSearchScope: NSMenuItem] = [:]
+    weak var activeContextMenu: NSMenu?
+    var contextMenuFilterText = ""
+    var currentDisplayMode: PaneDisplayMode = .browser
     private var isLoadingOverlayVisible = false
-    private var starEffectsEnabled = true
-    private var animationEffectSettings = AnimationEffectSettings.allEnabled
+    var starEffectsEnabled = true
+    var animationEffectSettings = AnimationEffectSettings.allEnabled
     private var shortcutGuideEnabled = false
     private let disableAnimationsForUITest = ProcessInfo.processInfo.arguments.contains("--disable-animations")
-    private weak var lastCursorRippleLayer: CALayer?
-    private var isSearchFieldFocused = false
+    weak var lastCursorRippleLayer: CALayer?
+    var isSearchFieldFocused = false
     private var pendingBreadcrumbDirectoryURL: URL?
     private var lastAppliedBreadcrumbDirectoryURL: URL?
     private var isBreadcrumbUpdateScheduled = false
-    private var rangeSelectionAnchorIndex: Int?
-    private var isMouseMultiSelectionActive = false
-    private var isApplyingSelectionFromViewModel = false
+    var rangeSelectionAnchorIndex: Int?
+    var isMouseMultiSelectionActive = false
+    var isApplyingSelectionFromViewModel = false
     private var searchControlsMinimumLeadingConstraint: NSLayoutConstraint?
     private var searchFieldMinimumWidthConstraint: NSLayoutConstraint?
 
@@ -381,8 +379,7 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
     }
 
     deinit {
-        thumbnailTasks.values.forEach { $0.cancel() }
-        thumbnailTasks.removeAll()
+        invalidateThumbnailCaches()
     }
 
     func focusTable() {
@@ -715,201 +712,6 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
             mediaCollectionLayout.invalidateLayout()
             mediaCollectionView.reloadData()
         }
-    }
-
-    func numberOfRows(in tableView: NSTableView) -> Int {
-        viewModel.directoryContents.displayedItems.count
-    }
-
-    func tableView(_ tableView: NSTableView, writeRowsWith rowIndexes: IndexSet, to pasteboard: NSPasteboard) -> Bool {
-        let urls = dragURLsForTableView(rowIndexes: rowIndexes)
-            .map(\.standardizedFileURL)
-        guard !urls.isEmpty else {
-            return false
-        }
-
-        pasteboard.clearContents()
-        return pasteboard.writeObjects(urls as [NSURL])
-    }
-
-    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        guard viewModel.directoryContents.displayedItems.indices.contains(row) else {
-            return nil
-        }
-
-        let item = viewModel.directoryContents.displayedItems[row]
-
-        switch tableColumn?.identifier {
-        case Column.name:
-            let treeItem = viewModel.directoryContents.displayedTreeItems.indices.contains(row)
-                ? viewModel.directoryContents.displayedTreeItems[row]
-                : nil
-            return makeNameCell(for: item, row: row, treeItem: treeItem)
-        case Column.size:
-            return makeTextCell(text: sizeText(for: item), alignment: .right)
-        case Column.modified:
-            return makeTextCell(text: modifiedText(for: item), alignment: .left)
-        default:
-            return nil
-        }
-    }
-
-    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
-        let palette = filerTheme.palette
-        let rowView = MarkedRowView()
-        rowView.isMarkedRow = row == viewModel.paneState.cursorIndex
-        rowView.isVisualMode = vimModeState.mode == .visual
-        rowView.markedColor = palette.markedColor
-        rowView.visualMarkedColor = palette.visualMarkedColor
-        return rowView
-    }
-
-    func tableView(_ tableView: NSTableView, typeSelectStringFor tableColumn: NSTableColumn?, row: Int) -> String? {
-        guard viewModel.directoryContents.displayedItems.indices.contains(row) else {
-            return nil
-        }
-        return viewModel.directoryContents.displayedItems[row].name
-    }
-
-    func tableView(
-        _ tableView: NSTableView,
-        nextTypeSelectMatchFromRow startRow: Int,
-        toRow endRow: Int,
-        for searchString: String
-    ) -> Int {
-        let normalizedSearch = searchString.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalizedSearch.isEmpty else {
-            return -1
-        }
-
-        for (index, item) in viewModel.directoryContents.displayedItems.enumerated() {
-            let matchedRange = item.name.range(
-                of: normalizedSearch,
-                options: [.anchored, .caseInsensitive, .diacriticInsensitive, .widthInsensitive],
-                range: nil,
-                locale: .current
-            )
-            if matchedRange != nil {
-                return index
-            }
-        }
-
-        return -1
-    }
-
-    func tableViewSelectionDidChange(_ notification: Notification) {
-        guard !isApplyingSelectionFromViewModel else {
-            return
-        }
-
-        let selectedRow = tableView.clickedRow >= 0 ? tableView.clickedRow : tableView.selectedRow
-        guard selectedRow >= 0 else {
-            return
-        }
-
-        isMouseMultiSelectionActive = false
-        viewModel.clearMarks()
-        rangeSelectionAnchorIndex = selectedRow
-        viewModel.setCursor(index: selectedRow)
-    }
-
-    func tableView(_ tableView: NSTableView, didClick tableColumn: NSTableColumn) {
-        let targetSortColumn: DirectoryContents.SortDescriptor.Column
-        switch tableColumn.identifier {
-        case Column.name:
-            targetSortColumn = .name
-        case Column.size:
-            targetSortColumn = .size
-        case Column.modified:
-            targetSortColumn = .date
-        default:
-            return
-        }
-
-        let currentSortDescriptor = viewModel.directoryContents.sortDescriptor
-        let nextAscending: Bool
-        if currentSortDescriptor.column == targetSortColumn {
-            nextAscending = !currentSortDescriptor.ascending
-        } else {
-            nextAscending = true
-        }
-
-        if starEffectsEnabled, animationEffectSettings.sortRowAnimation {
-            let transition = CATransition()
-            transition.type = .fade
-            transition.duration = 0.2
-            transition.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            scrollView.layer?.add(transition, forKey: "sortTransition")
-        }
-
-        viewModel.setSortDescriptor(.init(column: targetSortColumn, ascending: nextAscending))
-    }
-
-    func numberOfSections(in collectionView: NSCollectionView) -> Int {
-        1
-    }
-
-    func collectionView(_ collectionView: NSCollectionView, numberOfItemsInSection section: Int) -> Int {
-        viewModel.directoryContents.displayedItems.count
-    }
-
-    func collectionView(_ collectionView: NSCollectionView, itemForRepresentedObjectAt indexPath: IndexPath) -> NSCollectionViewItem {
-        let item = collectionView.makeItem(withIdentifier: MediaCollectionItem.identifier, for: indexPath)
-        guard
-            let mediaItem = item as? MediaCollectionItem,
-            viewModel.directoryContents.displayedItems.indices.contains(indexPath.item)
-        else {
-            return item
-        }
-
-        let fileItem = viewModel.directoryContents.displayedItems[indexPath.item]
-        let isMarked = indexPath.item == viewModel.paneState.cursorIndex
-        mediaItem.configure(
-            name: fileItem.name,
-            thumbnail: icon(for: fileItem, row: indexPath.item),
-            isMarked: isMarked,
-            isVideo: fileItem.url.isVideoFile,
-            palette: filerTheme.palette
-        )
-        return mediaItem
-    }
-
-    func collectionView(_ collectionView: NSCollectionView, didSelectItemsAt indexPaths: Set<IndexPath>) {
-        guard !isApplyingSelectionFromViewModel else {
-            return
-        }
-
-        guard let indexPath = indexPaths.first else {
-            return
-        }
-
-        isMouseMultiSelectionActive = false
-        viewModel.clearMarks()
-        rangeSelectionAnchorIndex = indexPath.item
-        viewModel.setCursor(index: indexPath.item)
-    }
-
-    func collectionView(_ collectionView: NSCollectionView, didDeselectItemsAt _: Set<IndexPath>) {
-        return
-    }
-
-    func collectionView(_ collectionView: NSCollectionView, layout collectionViewLayout: NSCollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> NSSize {
-        let insets = mediaCollectionLayout.sectionInset
-        let interitemSpacing = mediaCollectionLayout.minimumInteritemSpacing
-        let availableWidth = max(120, collectionView.bounds.width - insets.left - insets.right)
-        let targetWidth = preferredMediaTileWidth()
-        let columns = max(Int((availableWidth + interitemSpacing) / (targetWidth + interitemSpacing)), 1)
-        let totalSpacing = CGFloat(max(columns - 1, 0)) * interitemSpacing
-        let width = floor((availableWidth - totalSpacing) / CGFloat(columns))
-        return NSSize(width: width, height: width * 0.78 + 34)
-    }
-
-    func fileTableView(_ tableView: FileTableView, didTrigger action: KeyAction) -> Bool {
-        handleKeyAction(action)
-    }
-
-    func mediaCollectionView(_ collectionView: MediaCollectionView, didTrigger action: KeyAction) -> Bool {
-        handleKeyAction(action)
     }
 
     private func configureContainerAppearance() {
@@ -1442,155 +1244,13 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
         mediaCollectionView.menu = menu
     }
 
-    private func configureDragAndDrop() {
-        tableView.registerForDraggedTypes([.fileURL])
-        tableView.setDraggingSourceOperationMask([.copy, .move], forLocal: true)
-        tableView.setDraggingSourceOperationMask([.copy], forLocal: false)
-        tableView.dragSourceHandler = fileDragSource
-        tableView.dragURLsProvider = { [weak self] in
-            self?.dragURLsForTableView() ?? []
-        }
-        tableView.dropTargetHandler = fileDropTarget
-
-        mediaCollectionView.setDraggingSourceOperationMask([.copy, .move], forLocal: true)
-        mediaCollectionView.setDraggingSourceOperationMask([.copy], forLocal: false)
-        mediaCollectionView.dragSourceHandler = fileDragSource
-        mediaCollectionView.dragURLsProvider = { [weak self] in
-            self?.viewModel.markedOrSelectedURLs() ?? []
-        }
-
-        fileDropTarget.onHighlightChanged = { [weak self] highlighted in
-            guard let self else {
-                return
-            }
-            self.isDropTargetHighlighted = highlighted
-            self.updateActiveAppearance()
-            if highlighted {
-                self.startDropPulse()
-            } else {
-                self.stopDropPulse()
-            }
-        }
-
-        fileDropTarget.onDropCompleted = { [weak self] operation, itemCount in
-            guard let self else { return }
-            self.stopDropPulse()
-            if self.starEffectsEnabled, self.animationEffectSettings.dropZonePulse, let layer = self.view.layer {
-                let center = CGPoint(x: layer.bounds.midX, y: layer.bounds.midY)
-                StarSparkleAnimator.burst(count: 6, in: layer, at: center,
-                    color: self.filerTheme.palette.starGlowColor, size: 8, duration: 0.4)
-            }
-            self.viewModel.refreshCurrentDirectory()
-            self.onDropOperationCompleted?(operation, itemCount)
-        }
-
-        fileDropTarget.onDropFailed = { [weak self] message in
-            self?.presentDropError(message)
-        }
-    }
-
-    private func dragURLsForTableView(rowIndexes: IndexSet? = nil) -> [URL] {
-        if let rowIndexes, !rowIndexes.isEmpty {
-            let displayedItems = viewModel.directoryContents.displayedItems
-            let rowURLs = rowIndexes.compactMap { row -> URL? in
-                guard displayedItems.indices.contains(row) else {
-                    return nil
-                }
-                return displayedItems[row].url
-            }
-            if !rowURLs.isEmpty {
-                return rowURLs
-            }
-        }
-
-        if !viewModel.paneState.markedIndices.isEmpty {
-            return viewModel.markedOrSelectedURLs()
-        }
-
-        let displayedItems = viewModel.directoryContents.displayedItems
-        let selectedURLs = tableView.selectedRowIndexes.compactMap { row -> URL? in
-            guard displayedItems.indices.contains(row) else {
-                return nil
-            }
-            return displayedItems[row].url
-        }
-        if !selectedURLs.isEmpty {
-            return selectedURLs
-        }
-
-        let clickedRow = tableView.clickedRow
-        if displayedItems.indices.contains(clickedRow) {
-            return [displayedItems[clickedRow].url]
-        }
-
-        return viewModel.markedOrSelectedURLs()
-    }
-
-    private func dropDestinationDirectory(for draggingInfo: NSDraggingInfo) -> URL? {
-        let row = dropDestinationRow(for: draggingInfo)
-        guard viewModel.directoryContents.displayedItems.indices.contains(row) else {
-            return nil
-        }
-
-        let item = viewModel.directoryContents.displayedItems[row]
-        guard item.isDirectory, !item.isPackage else {
-            return nil
-        }
-
-        return item.url.standardizedFileURL
-    }
-
-    private func dropDestinationRow(for draggingInfo: NSDraggingInfo) -> Int {
-        let draggingPoint = draggingInfo.draggingLocation
-        var candidatePoints: [NSPoint] = []
-
-        // Most destinations receive draggingLocation in window coordinates.
-        candidatePoints.append(tableView.convert(draggingPoint, from: nil))
-
-        // Some environments can report screen coordinates.
-        if let window = tableView.window {
-            let windowPoint = window.convertPoint(fromScreen: draggingPoint)
-            candidatePoints.append(tableView.convert(windowPoint, from: nil))
-        }
-
-        // Fallback for cases where draggingLocation is already local coordinates.
-        candidatePoints.append(draggingPoint)
-
-        for point in candidatePoints {
-            let row = dropDestinationRow(at: point)
-            if row >= 0 {
-                return row
-            }
-        }
-
-        return -1
-    }
-
-    private func dropDestinationRow(at point: NSPoint) -> Int {
-        let directRow = tableView.row(at: point)
-        if directRow >= 0 {
-            return directRow
-        }
-
-        let probeRect = NSRect(
-            x: tableView.bounds.minX,
-            y: point.y,
-            width: max(tableView.bounds.width, 1),
-            height: 1
-        )
-        let intersectingRows = tableView.rows(in: probeRect)
-        return intersectingRows.location == NSNotFound ? -1 : intersectingRows.location
-    }
-
     private func bindViewModel() {
         viewModel.onItemsChanged = { [weak self] _ in
             guard let self else {
                 return
             }
 
-            self.thumbnailTasks.values.forEach { $0.cancel() }
-            self.thumbnailTasks.removeAll()
-            self.thumbnailCache.removeAllObjects()
+            self.invalidateThumbnailCaches()
 
             // Sync search field from filter text only while in filter mode.
             // In spotlight mode, keep the typed query visible.
@@ -1665,7 +1325,7 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
         applyDisplayMode(viewModel.displayMode)
     }
 
-    private func restoreNormalModeIfNeededAfterSearch() {
+    func restoreNormalModeIfNeededAfterSearch() {
         guard vimModeState.mode == .filter else {
             return
         }
@@ -1814,7 +1474,7 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
         return selectedItem?.url.standardizedFileURL.path
     }
 
-    private func updateActiveAppearance() {
+    func updateActiveAppearance() {
         let palette = filerTheme.palette
         let headerColor: NSColor
         if isDropTargetHighlighted {
@@ -1911,7 +1571,7 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
         openSelectedFile()
     }
 
-    private func makeNameCell(for item: FileItem, row: Int, treeItem: TreeDisplayItem? = nil) -> NSTableCellView {
+    func makeNameCell(for item: FileItem, row: Int, treeItem: TreeDisplayItem? = nil) -> NSTableCellView {
         let cell = tableView.makeView(withIdentifier: Cell.name, owner: self) as? FileNameCellView ?? createNameCellView()
 
         let isMarked = row == viewModel.paneState.cursorIndex
@@ -1936,7 +1596,7 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
         return cell
     }
 
-    private func makeTextCell(text: String, alignment: NSTextAlignment) -> NSTableCellView {
+    func makeTextCell(text: String, alignment: NSTextAlignment) -> NSTableCellView {
         let cell = tableView.makeView(withIdentifier: Cell.text, owner: self) as? NSTableCellView ?? createTextCellView()
         cell.textField?.stringValue = text
         cell.textField?.alignment = alignment
@@ -1971,269 +1631,12 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
         return cell
     }
 
-    private func icon(for item: FileItem, row: Int) -> NSImage {
-        if !item.isDirectory && item.url.isMediaFile {
-            let thumbnailKey = thumbnailCacheKey(for: item)
-
-            if let thumbnail = thumbnailCache.object(forKey: thumbnailKey) {
-                return thumbnail
-            }
-
-            scheduleThumbnailLoadIfNeeded(for: item, row: row, key: thumbnailKey)
-        }
-
-        return fallbackIcon(for: item)
-    }
-
-    private func fallbackIcon(for item: FileItem) -> NSImage {
-        let iconSize = currentDisplayMode == .media ? fileIconSize : Self.browserModeIconSize
-        let pixelSize = Int(iconSize.rounded())
-        let cacheKey = "\(item.url.path)#\(pixelSize)" as NSString
-
-        if let cached = iconCache.object(forKey: cacheKey) {
-            return cached
-        }
-
-        let icon = NSWorkspace.shared.icon(forFile: item.url.path)
-        icon.isTemplate = false
-        icon.size = NSSize(width: CGFloat(pixelSize), height: CGFloat(pixelSize))
-        iconCache.setObject(icon, forKey: cacheKey)
-        return icon
-    }
-
-    private func thumbnailCacheKey(for item: FileItem) -> NSString {
-        let pixelSize = thumbnailPixelSizeForCurrentDisplayMode()
-        return "thumb#\(item.url.path)#\(pixelSize)" as NSString
-    }
-
-    private func scheduleThumbnailLoadIfNeeded(for item: FileItem, row: Int, key: NSString) {
-        guard thumbnailTasks[key] == nil else {
-            return
-        }
-
-        let targetURL = item.url.standardizedFileURL
-        let size = thumbnailPixelSizeForCurrentDisplayMode()
-
-        thumbnailTasks[key] = Task { [weak self] in
-            guard let self else {
-                return
-            }
-
-            let thumbnail = await Self.generateThumbnail(for: targetURL, maxPixelSize: size)
-            guard !Task.isCancelled else {
-                await MainActor.run {
-                    self.thumbnailTasks.removeValue(forKey: key)
-                }
-                return
-            }
-
-            await MainActor.run {
-                self.thumbnailTasks.removeValue(forKey: key)
-                guard let thumbnail else {
-                    return
-                }
-
-                self.thumbnailCache.setObject(thumbnail, forKey: key)
-
-                guard self.viewModel.directoryContents.displayedItems.indices.contains(row) else {
-                    return
-                }
-
-                if self.viewModel.directoryContents.displayedItems[row].url.standardizedFileURL != targetURL {
-                    return
-                }
-
-                let rowIndexes = IndexSet(integer: row)
-                let columnIndexes = IndexSet(integersIn: 0 ..< self.tableView.numberOfColumns)
-                self.tableView.reloadData(forRowIndexes: rowIndexes, columnIndexes: columnIndexes)
-                self.mediaCollectionView.reloadItems(at: [IndexPath(item: row, section: 0)])
-            }
-        }
-    }
-
-    private func preferredMediaTileWidth() -> CGFloat {
-        min(max(fileIconSize * 5.5, 120), 260)
-    }
-
-    private func thumbnailPixelSizeForCurrentDisplayMode() -> Int {
-        if currentDisplayMode == .media {
-            return max(128, Int((preferredMediaTileWidth() * 2).rounded()))
-        }
-
-        return max(16, Int((Self.browserModeIconSize * 2).rounded()))
-    }
-
-    private static func generateThumbnail(for url: URL, maxPixelSize: Int) async -> NSImage? {
-        await Task.detached(priority: .utility) {
-            if url.isImageFile {
-                guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
-                    return nil
-                }
-
-                let options: [CFString: Any] = [
-                    kCGImageSourceCreateThumbnailFromImageAlways: true,
-                    kCGImageSourceShouldCacheImmediately: false,
-                    kCGImageSourceCreateThumbnailWithTransform: true,
-                    kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
-                ]
-
-                guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
-                    return nil
-                }
-
-                let size = NSSize(width: cgImage.width, height: cgImage.height)
-                return NSImage(cgImage: cgImage, size: size)
-            }
-
-            if url.isVideoFile {
-                let asset = AVURLAsset(url: url)
-                let generator = AVAssetImageGenerator(asset: asset)
-                generator.appliesPreferredTrackTransform = true
-                generator.maximumSize = CGSize(width: maxPixelSize, height: maxPixelSize)
-                generator.requestedTimeToleranceBefore = CMTime(seconds: 5, preferredTimescale: 1)
-                generator.requestedTimeToleranceAfter = CMTime(seconds: 5, preferredTimescale: 1)
-
-                let time = CMTime(seconds: 1, preferredTimescale: 600)
-                if let result = try? await generator.image(at: time) {
-                    let size = NSSize(width: result.image.width, height: result.image.height)
-                    return NSImage(cgImage: result.image, size: size)
-                }
-                return nil
-            }
-
-            return nil
-        }.value
-    }
-
-    private func sizeText(for item: FileItem) -> String {
-        guard !item.isDirectory || item.isPackage, let size = item.size else {
-            return ""
-        }
-        return Self.byteFormatter.string(fromByteCount: size)
-    }
-
-    private func modifiedText(for item: FileItem) -> String {
-        guard let date = item.dateModified else {
-            return ""
-        }
-        return Self.dateFormatter.string(from: date)
-    }
-
     private func handleTabPressed() -> Bool {
         onTabPressed?() ?? false
     }
 
-    private var selectedSearchMode: SearchMode {
-        currentSearchMode
-    }
-
-    private func focusSearch(mode: SearchMode) {
-        if selectedSearchMode != mode {
-            currentSearchMode = mode
-            updateSearchModeUI()
-        }
-
-        onDidRequestActivate?()
-        vimModeState.enterFilterMode()
-        tableView.setVimMode(vimModeState.mode)
-        mediaCollectionView.setVimMode(vimModeState.mode)
-
-        isSearchFieldFocused = true
-        view.window?.makeFirstResponder(searchField)
-        searchField.selectText(nil)
-        updateSearchFieldAppearance()
-
-        if starEffectsEnabled, animationEffectSettings.filterBarGlow {
-            let palette = filerTheme.palette
-            searchField.wantsLayer = true
-            searchField.layer?.shadowColor = palette.starAccentColor.cgColor
-            searchField.layer?.shadowRadius = 6
-            searchField.layer?.shadowOffset = .zero
-            searchField.layer?.shadowOpacity = 0
-
-            let glow = CAKeyframeAnimation(keyPath: "shadowOpacity")
-            glow.values = [0.0, 0.6, 0.2]
-            glow.keyTimes = [0, 0.5, 1.0]
-            glow.duration = 0.3
-            glow.isRemovedOnCompletion = false
-            glow.fillMode = .forwards
-            searchField.layer?.shadowOpacity = 0.2
-            searchField.layer?.add(glow, forKey: "searchGlow")
-        }
-    }
-
-    private func clearSearchAndReturnToTable() {
-        searchField.stringValue = ""
-        currentSearchMode = .filter
-        updateSearchModeUI()
-        viewModel.clearFilter()
-        viewModel.exitSpotlightSearchMode()
-
-        searchField.layer?.removeAnimation(forKey: "searchGlow")
-        searchField.layer?.shadowOpacity = 0
-
-        switchToNormalModeAndFocusTable()
-    }
-
-    private func switchToNormalModeAndFocusTable() {
-        vimModeState.enterNormalMode()
-        tableView.setVimMode(vimModeState.mode)
-        mediaCollectionView.setVimMode(vimModeState.mode)
-        focusTable()
-    }
-
-    private func updateSearchModeUI() {
-        let mode = selectedSearchMode
-        updateSearchFieldButtonIcon(
-            symbolName: mode.iconSymbolName,
-            accessibilityLabel: mode.iconAccessibilityLabel
-        )
-        updateSearchMenuSelectionStates()
-        updateSearchFieldAppearance()
-    }
-
-    private func updateSearchFieldAppearance() {
-        guard isViewLoaded else {
-            return
-        }
-
-        let palette = filerTheme.palette
-        let borderColor = isSearchFieldFocused ? palette.activeBorderColor : NSColor.separatorColor
-        searchField.layer?.borderColor = borderColor.cgColor
-        searchField.layer?.borderWidth = isSearchFieldFocused ? 1.0 : 0.5
-    }
-
-    private func updateSearchMenuSelectionStates() {
-        for (mode, item) in searchMenuModeItems {
-            item.state = selectedSearchMode == mode ? .on : .off
-        }
-
-        for (scope, item) in searchMenuScopeItems {
-            item.state = viewModel.spotlightSearchScope == scope ? .on : .off
-        }
-    }
-
-    private func applySearchFromHeader() {
-        let query = searchField.stringValue
-
-        switch selectedSearchMode {
-        case .filter:
-            viewModel.exitSpotlightSearchMode()
-            viewModel.setFilterText(query)
-        case .spotlight:
-            viewModel.clearFilter()
-            let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty {
-                viewModel.exitSpotlightSearchMode()
-            } else {
-                viewModel.enterSpotlightSearchMode()
-                viewModel.updateSpotlightSearchQuery(trimmed)
-            }
-        }
-    }
-
     @discardableResult
-    private func handleKeyAction(_ action: KeyAction) -> Bool {
+    func handleKeyAction(_ action: KeyAction) -> Bool {
         let handled: Bool
 
         switch action {
@@ -2533,589 +1936,6 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
         pasteboard.setString(paths.joined(separator: "\n"), forType: .string)
     }
 
-    private func presentDropError(_ message: String) {
-        let alert = NSAlert()
-        alert.alertStyle = .warning
-        alert.messageText = "Drop Failed"
-        alert.informativeText = message
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
-    }
-
-    func controlTextDidBeginEditing(_ obj: Notification) {
-        guard (obj.object as? NSControl) === searchField else {
-            return
-        }
-
-        onDidRequestActivate?()
-        isSearchFieldFocused = true
-        vimModeState.enterFilterMode()
-        tableView.setVimMode(vimModeState.mode)
-        mediaCollectionView.setVimMode(vimModeState.mode)
-        updateSearchFieldAppearance()
-    }
-
-    func controlTextDidChange(_ obj: Notification) {
-        guard let control = obj.object as? NSControl else {
-            return
-        }
-
-        if control === contextMenuFilterField {
-            handleContextMenuFilterChanged(contextMenuFilterField)
-            return
-        }
-
-        guard control === searchField else {
-            return
-        }
-
-        applySearchFromHeader()
-    }
-
-    func searchFieldDidEndSearching(_ sender: NSSearchField) {
-        guard sender === searchField else {
-            return
-        }
-
-        // NSSearchField's clear (x) button does not always emit controlTextDidChange.
-        // Ensure filter/spotlight state is synced when the field is cleared from the chrome.
-        applySearchFromHeader()
-    }
-
-    func controlTextDidEndEditing(_ obj: Notification) {
-        guard (obj.object as? NSControl) === searchField else {
-            return
-        }
-
-        restoreNormalModeIfNeededAfterSearch()
-        isSearchFieldFocused = false
-        updateSearchFieldAppearance()
-    }
-
-    func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-        guard control === searchField else {
-            return false
-        }
-
-        if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
-            clearSearchAndReturnToTable()
-            return true
-        }
-
-        if commandSelector == #selector(NSResponder.insertNewline(_:)) {
-            if selectedSearchMode == .spotlight {
-                viewModel.enterSelected()
-                viewModel.exitSpotlightSearchMode()
-                searchField.stringValue = ""
-                currentSearchMode = .filter
-                updateSearchModeUI()
-
-                switchToNormalModeAndFocusTable()
-                return true
-            }
-
-            applySearchFromHeader()
-            let trimmedFilterQuery = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmedFilterQuery.isEmpty else {
-                switchToNormalModeAndFocusTable()
-                return true
-            }
-
-            viewModel.focusFirstBrowsableDirectoryInFilteredResults()
-            if let selectedItem = viewModel.selectedItem, selectedItem.isDirectory, !selectedItem.isPackage {
-                addSlideTransition(direction: .fromRight)
-                viewModel.enterSelected()
-                switchToNormalModeAndFocusTable()
-            }
-            return true
-        }
-
-        return false
-    }
-
-    private func configureSearchFieldMenuTemplate() {
-        let menu = NSMenu(title: "Search Options")
-        searchMenuModeItems.removeAll(keepingCapacity: true)
-        searchMenuScopeItems.removeAll(keepingCapacity: true)
-
-        let modeHeader = NSMenuItem(title: "Search Mode", action: nil, keyEquivalent: "")
-        modeHeader.isEnabled = false
-        menu.addItem(modeHeader)
-
-        for mode in [SearchMode.filter, .spotlight] {
-            let item = NSMenuItem(title: mode.menuTitle, action: #selector(handleSearchModeMenuSelection(_:)), keyEquivalent: "")
-            item.target = self
-            item.tag = mode.rawValue
-            menu.addItem(item)
-            searchMenuModeItems[mode] = item
-        }
-
-        menu.addItem(NSMenuItem.separator())
-
-        let scopeHeader = NSMenuItem(title: "Spotlight Scope", action: nil, keyEquivalent: "")
-        scopeHeader.isEnabled = false
-        menu.addItem(scopeHeader)
-
-        for scope in SpotlightSearchScope.allCases {
-            let item = NSMenuItem(title: scope.displayName, action: #selector(handleSpotlightScopeMenuSelection(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = scope.rawValue
-            menu.addItem(item)
-            searchMenuScopeItems[scope] = item
-        }
-
-        searchField.searchMenuTemplate = menu
-        updateSearchMenuSelectionStates()
-    }
-
-    private func configureSearchFieldButtonAction() {
-        guard let cell = searchField.cell as? NSSearchFieldCell else {
-            return
-        }
-        cell.searchButtonCell?.target = self
-        cell.searchButtonCell?.action = #selector(handleSearchFieldButtonClick(_:))
-    }
-
-    private func updateSearchFieldButtonIcon(symbolName: String, accessibilityLabel: String) {
-        guard let cell = searchField.cell as? NSSearchFieldCell,
-              let symbolImage = NSImage(systemSymbolName: symbolName, accessibilityDescription: accessibilityLabel) else {
-            return
-        }
-
-        let configuredImage = symbolImage.withSymbolConfiguration(
-            NSImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
-        ) ?? symbolImage
-        configuredImage.isTemplate = true
-
-        cell.searchButtonCell?.image = configuredImage
-        cell.searchButtonCell?.alternateImage = configuredImage
-        searchField.toolTip = accessibilityLabel
-    }
-
-    @objc
-    private func handleSearchFieldButtonClick(_ sender: Any?) {
-        guard let menu = searchField.searchMenuTemplate else {
-            return
-        }
-
-        if let event = NSApp.currentEvent {
-            NSMenu.popUpContextMenu(menu, with: event, for: searchField)
-            return
-        }
-
-        menu.popUp(positioning: nil, at: .zero, in: searchField)
-    }
-
-    @objc
-    private func handleSearchModeMenuSelection(_ sender: NSMenuItem) {
-        guard let mode = SearchMode(rawValue: sender.tag), selectedSearchMode != mode else {
-            return
-        }
-
-        currentSearchMode = mode
-        updateSearchModeUI()
-        applySearchFromHeader()
-    }
-
-    @objc
-    private func handleSpotlightScopeMenuSelection(_ sender: NSMenuItem) {
-        guard let rawValue = sender.representedObject as? String,
-              let scope = SpotlightSearchScope(rawValue: rawValue) else {
-            return
-        }
-
-        viewModel.setSpotlightSearchScope(scope)
-        onSpotlightSearchScopeChanged?(scope)
-        updateSearchMenuSelectionStates()
-        applySearchFromHeader()
-    }
-
-    // MARK: - Context Menu
-
-    private struct ContextMenuContext {
-        let contextItem: FileItem?
-        let hasContextItem: Bool
-    }
-
-    func menuWillOpen(_ menu: NSMenu) {
-        guard isPaneContextMenu(menu) else {
-            return
-        }
-
-        activeContextMenu = menu
-        focusContextMenuFilterField(in: menu)
-    }
-
-    func menuDidClose(_ menu: NSMenu) {
-        guard isPaneContextMenu(menu) else {
-            return
-        }
-
-        activeContextMenu = nil
-        contextMenuFilterText = ""
-    }
-
-    func menuNeedsUpdate(_ menu: NSMenu) {
-        guard isPaneContextMenu(menu) else {
-            return
-        }
-
-        activeContextMenu = menu
-        contextMenuFilterText = ""
-        rebuildContextMenu(menu, filterText: contextMenuFilterText)
-        focusContextMenuFilterField(in: menu)
-    }
-
-    private func isPaneContextMenu(_ menu: NSMenu) -> Bool {
-        menu === tableView.menu || menu === mediaCollectionView.menu
-    }
-
-    private func makeContextMenuFilterField() -> NSSearchField {
-        let field = NSSearchField(frame: .zero)
-        field.controlSize = .small
-        field.placeholderString = "Filter actions..."
-        field.font = .systemFont(ofSize: 12)
-        field.sendsSearchStringImmediately = true
-        field.sendsWholeSearchString = true
-        field.target = self
-        field.action = #selector(handleContextMenuFilterChanged(_:))
-        field.delegate = self
-        return field
-    }
-
-    private func rebuildContextMenu(_ menu: NSMenu, filterText: String) {
-        menu.removeAllItems()
-        menu.addItem(makeContextMenuFilterMenuItem())
-        menu.addItem(NSMenuItem.separator())
-        contextMenuFilterField.stringValue = filterText
-        updateContextMenuActionItems(in: menu, filterText: filterText)
-    }
-
-    private func makeContextMenuFilterMenuItem() -> NSMenuItem {
-        let item = NSMenuItem()
-        let container = NSView(
-            frame: NSRect(
-                x: 0,
-                y: 0,
-                width: ContextMenuMetrics.filterWidth,
-                height: ContextMenuMetrics.filterHeight
-            )
-        )
-
-        contextMenuFilterField.removeFromSuperview()
-        contextMenuFilterField.frame = NSRect(
-            x: ContextMenuMetrics.filterFieldInset,
-            y: (ContextMenuMetrics.filterHeight - 22) / 2,
-            width: ContextMenuMetrics.filterWidth - (ContextMenuMetrics.filterFieldInset * 2),
-            height: 22
-        )
-        contextMenuFilterField.autoresizingMask = [.width]
-        container.addSubview(contextMenuFilterField)
-        item.view = container
-        return item
-    }
-
-    private func updateContextMenuActionItems(in menu: NSMenu, filterText: String) {
-        while menu.items.count > ContextMenuMetrics.staticHeaderItemCount {
-            menu.removeItem(at: ContextMenuMetrics.staticHeaderItemCount)
-        }
-
-        let allItems = makeContextMenuActionItems()
-        let visibleItems = filterContextMenuItems(allItems, query: filterText)
-        if visibleItems.isEmpty {
-            let emptyItem = NSMenuItem(title: "No matching actions", action: nil, keyEquivalent: "")
-            emptyItem.isEnabled = false
-            menu.addItem(emptyItem)
-            return
-        }
-
-        visibleItems.forEach { menu.addItem($0) }
-    }
-
-    @objc
-    private func handleContextMenuFilterChanged(_ sender: NSSearchField) {
-        guard sender === contextMenuFilterField else {
-            return
-        }
-
-        contextMenuFilterText = sender.stringValue
-        guard let menu = activeContextMenu else {
-            return
-        }
-
-        updateContextMenuActionItems(in: menu, filterText: contextMenuFilterText)
-    }
-
-    private func makeContextMenuActionItems() -> [NSMenuItem] {
-        let context = currentContextMenuContext()
-        let contextItem = context.contextItem
-        let hasContextItem = context.hasContextItem
-
-        var items: [NSMenuItem] = []
-
-        let openTitle: String
-        if let contextItem, contextItem.isDirectory && !contextItem.isPackage {
-            openTitle = "Open"
-        } else {
-            openTitle = "Open with Default App"
-        }
-
-        items.append(makeContextMenuItem(
-            title: openTitle,
-            action: .openFile,
-            shortcutActions: [.enterDirectory, .openFile],
-            requiresContextItem: true,
-            enabled: hasContextItem
-        ))
-
-        if let contextItem, contextItem.url.isImageFile {
-            let openInPixelmatorItem = NSMenuItem(
-                title: "Open in Pixelmator Pro",
-                action: #selector(handleOpenInPixelmatorFromContextMenu(_:)),
-                keyEquivalent: ""
-            )
-            openInPixelmatorItem.target = self
-            openInPixelmatorItem.tag = 1
-            items.append(openInPixelmatorItem)
-        }
-
-        items.append(makeContextMenuItem(
-            title: "Show in Finder",
-            action: .openFileInFinder,
-            requiresContextItem: true,
-            enabled: hasContextItem
-        ))
-
-        items.append(NSMenuItem.separator())
-
-        items.append(makeContextMenuItem(
-            title: "Toggle Mark",
-            action: .toggleMark,
-            requiresContextItem: true,
-            enabled: hasContextItem
-        ))
-        items.append(makeContextMenuItem(
-            title: "Mark All",
-            action: .markAll,
-            enabled: !viewModel.directoryContents.displayedItems.isEmpty
-        ))
-        items.append(makeContextMenuItem(
-            title: "Clear Marks",
-            action: .clearMarks,
-            enabled: viewModel.markedCount > 0
-        ))
-
-        if vimModeState.mode == .visual {
-            items.append(makeContextMenuItem(title: "End Visual Selection", action: .exitVisualMode))
-        } else {
-            items.append(makeContextMenuItem(
-                title: "Start Visual Selection",
-                action: .enterVisualMode,
-                requiresContextItem: true,
-                enabled: hasContextItem
-            ))
-        }
-
-        items.append(NSMenuItem.separator())
-
-        items.append(makeContextMenuItem(
-            title: "Copy",
-            action: .copyToClipboard,
-            requiresContextItem: true,
-            enabled: hasContextItem
-        ))
-        items.append(makeContextMenuItem(
-            title: "Copy File/Folder Path",
-            action: .copySelectedItemPath,
-            requiresContextItem: true,
-            enabled: hasContextItem
-        ))
-        items.append(makeContextMenuItem(
-            title: "Cut",
-            action: .cutToClipboard,
-            requiresContextItem: true,
-            enabled: hasContextItem
-        ))
-        items.append(makeContextMenuItem(title: "Paste", action: .pasteFromClipboard))
-
-        items.append(NSMenuItem.separator())
-
-        items.append(makeContextMenuItem(
-            title: "Rename...",
-            action: .rename,
-            requiresContextItem: true,
-            enabled: hasContextItem
-        ))
-        items.append(makeContextMenuItem(
-            title: "Move to Trash",
-            action: .delete,
-            requiresContextItem: true,
-            enabled: hasContextItem
-        ))
-        items.append(makeContextMenuItem(title: "New Folder", action: .createDirectory))
-        items.append(makeContextMenuItem(
-            title: "Batch Rename...",
-            action: .batchRename,
-            requiresContextItem: true,
-            enabled: hasContextItem
-        ))
-        items.append(makeContextMenuItem(title: "Sync: Left → Right", action: .syncPanesLeftToRight))
-        items.append(makeContextMenuItem(title: "Sync: Right → Left", action: .syncPanesRightToLeft))
-
-        items.append(NSMenuItem.separator())
-
-        items.append(makeContextMenuItem(title: "Filter...", action: .enterFilterMode))
-        items.append(makeContextMenuItem(title: "Spotlight Search...", action: .enterSpotlightSearch))
-        items.append(makeContextMenuItem(title: "Clear Filter", action: .clearFilter))
-        items.append(makeContextMenuItem(title: "Bookmark Search...", action: .openBookmarkSearch))
-        items.append(makeContextMenuItem(title: "History...", action: .openHistory))
-        items.append(makeContextMenuItem(title: "Add Bookmark...", action: .addBookmark))
-        items.append(makeContextMenuItem(title: "Toggle Pin", action: .togglePin))
-
-        items.append(NSMenuItem.separator())
-
-        items.append(makeContextMenuItem(title: "Back", action: .goBack))
-        items.append(makeContextMenuItem(title: "Forward", action: .goForward))
-        items.append(makeContextMenuItem(title: "Enclosing Folder", action: .goToParent))
-        items.append(makeContextMenuItem(title: "Home", action: .goHome))
-        items.append(makeContextMenuItem(title: "Desktop", action: .goDesktop))
-        items.append(makeContextMenuItem(title: "Documents", action: .goDocuments))
-        items.append(makeContextMenuItem(title: "Downloads", action: .goDownloads))
-        items.append(makeContextMenuItem(title: "Applications", action: .goApplications))
-        items.append(makeContextMenuItem(title: "Refresh", action: .refresh))
-        items.append(makeContextMenuItem(title: "Toggle Hidden Files", action: .toggleHiddenFiles))
-        items.append(makeSortMenuItem())
-        items.append(makeContextMenuItem(title: "Toggle Media Mode", action: .toggleMediaMode))
-        items.append(makeContextMenuItem(title: "Toggle Recursive Mode", action: .toggleRecursive))
-
-        items.append(NSMenuItem.separator())
-
-        items.append(makeContextMenuItem(title: "Toggle Sidebar", action: .toggleSidebar))
-        items.append(makeContextMenuItem(title: "Toggle Left Pane", action: .toggleLeftPane))
-        items.append(makeContextMenuItem(title: "Toggle Right Pane", action: .toggleRightPane))
-        items.append(makeContextMenuItem(title: "Equalize Pane Widths", action: .equalizePaneWidths))
-        items.append(makeContextMenuItem(title: "Set Other Pane to Current Folder", action: .matchOtherPaneDirectory))
-        items.append(makeContextMenuItem(title: "Go to Other Pane Folder", action: .goToOtherPaneDirectory))
-        items.append(makeContextMenuItem(title: "Switch Pane", action: .switchPane))
-
-        return normalizeContextMenuItems(items)
-    }
-
-    private func currentContextMenuContext() -> ContextMenuContext {
-        let clickedRow = contextMenuClickedRow()
-        let hasClickedItem = viewModel.directoryContents.displayedItems.indices.contains(clickedRow)
-        let clickedItem = hasClickedItem ? viewModel.directoryContents.displayedItems[clickedRow] : nil
-        let contextItem = clickedItem ?? viewModel.selectedItem
-        return ContextMenuContext(contextItem: contextItem, hasContextItem: contextItem != nil)
-    }
-
-    private func contextMenuClickedRow() -> Int {
-        if currentDisplayMode == .media {
-            return mediaCollectionView.selectionIndexPaths.first?.item ?? -1
-        }
-
-        return tableView.clickedRow
-    }
-
-    private func filterContextMenuItems(_ items: [NSMenuItem], query: String) -> [NSMenuItem] {
-        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedQuery.isEmpty else {
-            return items
-        }
-
-        var filtered: [NSMenuItem] = []
-        var shouldInsertSeparator = false
-
-        for item in items {
-            if item.isSeparatorItem {
-                shouldInsertSeparator = !filtered.isEmpty
-                continue
-            }
-
-            guard contextMenuItemMatchesQuery(item, query: trimmedQuery) else {
-                continue
-            }
-
-            if shouldInsertSeparator, !filtered.isEmpty {
-                filtered.append(NSMenuItem.separator())
-            }
-            filtered.append(item)
-            shouldInsertSeparator = false
-        }
-
-        return normalizeContextMenuItems(filtered)
-    }
-
-    private func contextMenuItemMatchesQuery(_ item: NSMenuItem, query: String) -> Bool {
-        if item.title.localizedCaseInsensitiveContains(query) {
-            return true
-        }
-
-        guard let submenu = item.submenu else {
-            return false
-        }
-
-        let filteredSubItems = filterContextMenuItems(submenu.items, query: query)
-        guard !filteredSubItems.isEmpty else {
-            return false
-        }
-
-        submenu.removeAllItems()
-        filteredSubItems.forEach { submenu.addItem($0) }
-        return true
-    }
-
-    private func normalizeContextMenuItems(_ items: [NSMenuItem]) -> [NSMenuItem] {
-        var normalized: [NSMenuItem] = []
-        var previousWasSeparator = true
-
-        for item in items {
-            if item.isSeparatorItem {
-                guard !previousWasSeparator else {
-                    continue
-                }
-                normalized.append(item)
-                previousWasSeparator = true
-                continue
-            }
-
-            normalized.append(item)
-            previousWasSeparator = false
-        }
-
-        if normalized.last?.isSeparatorItem == true {
-            normalized.removeLast()
-        }
-
-        return normalized
-    }
-
-    private func focusContextMenuFilterField(in menu: NSMenu) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self,
-                  self.activeContextMenu === menu,
-                  let window = self.contextMenuFilterField.window else {
-                return
-            }
-
-            window.makeFirstResponder(self.contextMenuFilterField)
-        }
-    }
-
-    private func makeSortMenuItem() -> NSMenuItem {
-        let item = NSMenuItem(title: "Sort", action: nil, keyEquivalent: "")
-        let submenu = NSMenu(title: "Sort")
-
-        submenu.addItem(makeContextMenuItem(title: "By Name", action: .sortByName))
-        submenu.addItem(makeContextMenuItem(title: "By Size", action: .sortBySize))
-        submenu.addItem(makeContextMenuItem(title: "By Date", action: .sortByDate))
-        submenu.addItem(makeContextMenuItem(title: "By Selection Order", action: .sortBySelectionOrder))
-        submenu.addItem(makeContextMenuItem(title: "Reverse Sort Order", action: .reverseSortOrder))
-
-        item.submenu = submenu
-        return item
-    }
-
     private func updateColumnHeaderTitles() {
         let currentSort = viewModel.directoryContents.sortDescriptor
 
@@ -3145,201 +1965,4 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
         }
     }
 
-    private func makeContextMenuItem(
-        title: String,
-        action keyAction: KeyAction,
-        shortcutActions: [KeyAction]? = nil,
-        requiresContextItem: Bool = false,
-        enabled: Bool = true
-    ) -> NSMenuItem {
-        let actionsForShortcut = shortcutActions ?? [keyAction]
-        let item = NSMenuItem(
-            title: contextMenuTitle(title, actions: actionsForShortcut),
-            action: #selector(contextMenuPerformAction(_:)),
-            keyEquivalent: ""
-        )
-        item.target = self
-        item.representedObject = keyAction
-        item.tag = requiresContextItem ? 1 : 0
-        item.isEnabled = enabled
-        return item
-    }
-
-    private func contextMenuTitle(_ title: String, actions: [KeyAction]) -> String {
-        var seen = Set<String>()
-        var shortcuts: [String] = []
-
-        for action in actions {
-            for shortcut in preferredShortcuts(for: action) where !seen.contains(shortcut) {
-                seen.insert(shortcut)
-                shortcuts.append(shortcut)
-            }
-        }
-
-        guard !shortcuts.isEmpty else {
-            return title
-        }
-
-        return "\(title) (\(shortcuts.joined(separator: " / ")))"
-    }
-
-    private func preferredShortcuts(for action: KeyAction) -> [String] {
-        let normal = keybindingManager.shortcuts(for: action, mode: .normal)
-        if !normal.isEmpty {
-            return normal
-        }
-
-        let visual = keybindingManager.shortcuts(for: action, mode: .visual)
-        if !visual.isEmpty {
-            return visual
-        }
-
-        return keybindingManager.shortcuts(for: action, mode: .filter)
-    }
-
-    @objc
-    private func contextMenuPerformAction(_ sender: NSMenuItem) {
-        guard let action = sender.representedObject as? KeyAction else {
-            return
-        }
-
-        let requiresContextItem = sender.tag == 1
-        guard resolveContextSelectionIfNeeded(requiresContextItem: requiresContextItem) else {
-            return
-        }
-
-        _ = handleKeyAction(action)
-    }
-
-    private func resolveContextSelectionIfNeeded(requiresContextItem: Bool) -> Bool {
-        guard requiresContextItem else {
-            return true
-        }
-
-        let clickedRow = contextMenuClickedRow()
-        if viewModel.directoryContents.displayedItems.indices.contains(clickedRow) {
-            viewModel.setCursor(index: clickedRow)
-            return true
-        }
-
-        return viewModel.selectedItem != nil
-    }
-
-    @objc
-    private func handleOpenInPixelmatorFromContextMenu(_ sender: NSMenuItem) {
-        let requiresContextItem = sender.tag == 1
-        guard resolveContextSelectionIfNeeded(requiresContextItem: requiresContextItem),
-              let selectedItem = viewModel.selectedItem,
-              selectedItem.url.isImageFile else {
-            NSSound.beep()
-            return
-        }
-
-        let appURL = Self.pixelmatorProAppURL
-        guard FileManager.default.fileExists(atPath: appURL.path) else {
-            NSSound.beep()
-            return
-        }
-
-        NSWorkspace.shared.open(
-            [selectedItem.url],
-            withApplicationAt: appURL,
-            configuration: NSWorkspace.OpenConfiguration()
-        ) { _, error in
-            if error != nil {
-                NSSound.beep()
-            }
-        }
-    }
-
-    // MARK: - Animation Helpers
-
-    private func addSlideTransition(direction: CATransitionSubtype) {
-        guard starEffectsEnabled, animationEffectSettings.directoryTransitionSlide else { return }
-        let transition = CATransition()
-        transition.type = .push
-        transition.subtype = direction
-        transition.duration = 0.18
-        transition.timingFunction = CAMediaTimingFunction(name: .easeOut)
-        scrollView.layer?.add(transition, forKey: "directoryTransition")
-    }
-
-    private func flashRow(at row: Int, color: NSColor, duration: CFTimeInterval) {
-        guard let rowView = tableView.rowView(atRow: row, makeIfNecessary: false) else { return }
-        rowView.wantsLayer = true
-        let flash = CALayer()
-        flash.frame = rowView.bounds
-        flash.backgroundColor = color.cgColor
-        flash.cornerRadius = 2
-        rowView.layer?.addSublayer(flash)
-
-        let fadeOut = CABasicAnimation(keyPath: "opacity")
-        fadeOut.fromValue = 1.0
-        fadeOut.toValue = 0.0
-        fadeOut.duration = duration
-        fadeOut.isRemovedOnCompletion = false
-        fadeOut.fillMode = .forwards
-        fadeOut.delegate = StarSparkleAnimator.makeRemovalDelegate(for: flash)
-        flash.add(fadeOut, forKey: "rowFlash")
-    }
-
-    private func animateCursorRipple(at row: Int) {
-        lastCursorRippleLayer?.removeFromSuperlayer()
-        lastCursorRippleLayer = nil
-
-        guard let rowView = tableView.rowView(atRow: row, makeIfNecessary: false) else { return }
-        rowView.wantsLayer = true
-
-        let palette = filerTheme.palette
-        let alpha: CGFloat = vimModeState.mode == .visual ? 0.3 : 0.15
-        let duration: CFTimeInterval = vimModeState.mode == .visual ? 0.25 : 0.2
-
-        let ripple = CALayer()
-        ripple.frame = rowView.bounds
-        ripple.backgroundColor = palette.starAccentColor.withAlphaComponent(alpha).cgColor
-        ripple.cornerRadius = 2
-        rowView.layer?.addSublayer(ripple)
-        lastCursorRippleLayer = ripple
-
-        let fadeOut = CABasicAnimation(keyPath: "opacity")
-        fadeOut.fromValue = 1.0
-        fadeOut.toValue = 0.0
-        fadeOut.duration = duration
-        fadeOut.isRemovedOnCompletion = false
-        fadeOut.fillMode = .forwards
-        fadeOut.delegate = StarSparkleAnimator.makeRemovalDelegate(for: ripple)
-        ripple.add(fadeOut, forKey: "cursorRipple")
-    }
-
-    private func animateMarkCascade(topToBottom: Bool) {
-        let visibleRange = tableView.rows(in: tableView.visibleRect)
-        guard visibleRange.length > 0 else { return }
-
-        let rows = Array(visibleRange.location ..< NSMaxRange(visibleRange))
-        let orderedRows = topToBottom ? rows : rows.reversed()
-        let palette = filerTheme.palette
-
-        for (i, row) in orderedRows.enumerated() {
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .milliseconds(Int(i) * 20))
-                guard let self else { return }
-                self.flashRow(at: row, color: palette.starGlowColor.withAlphaComponent(0.25), duration: 0.3)
-            }
-        }
-    }
-
-    private func startDropPulse() {
-        guard starEffectsEnabled, animationEffectSettings.dropZonePulse else { return }
-        let pulse = CABasicAnimation(keyPath: "borderWidth")
-        pulse.fromValue = 1.0
-        pulse.toValue = 2.5
-        pulse.duration = 0.8
-        pulse.autoreverses = true
-        pulse.repeatCount = .infinity
-        view.layer?.add(pulse, forKey: "dropPulse")
-    }
-
-    private func stopDropPulse() {
-        view.layer?.removeAnimation(forKey: "dropPulse")
-    }
 }

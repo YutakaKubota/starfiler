@@ -31,6 +31,13 @@
 		CC0000000000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000001 /* AppDelegate.swift */; };
 		CC0000000000000000000002 /* MainWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000002 /* MainWindowController.swift */; };
 		CC0000000000000000000003 /* FilePaneViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000003 /* FilePaneViewController.swift */; };
+		CC0000000000000000000080 /* FilePaneViewController+Animations.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000080 /* FilePaneViewController+Animations.swift */; };
+		CC0000000000000000000081 /* FilePaneViewController+ContextMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000081 /* FilePaneViewController+ContextMenu.swift */; };
+		CC0000000000000000000082 /* FilePaneViewController+DragDrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000082 /* FilePaneViewController+DragDrop.swift */; };
+		CC0000000000000000000083 /* FilePaneViewController+TableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000083 /* FilePaneViewController+TableView.swift */; };
+		CC0000000000000000000084 /* FilePaneViewController+CollectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000084 /* FilePaneViewController+CollectionView.swift */; };
+		CC0000000000000000000085 /* FilePaneViewController+Thumbnails.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000085 /* FilePaneViewController+Thumbnails.swift */; };
+		CC0000000000000000000086 /* FilePaneViewController+Search.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000086 /* FilePaneViewController+Search.swift */; };
 		CC0000000000000000000004 /* FileTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000004 /* FileTableView.swift */; };
 		CC0000000000000000000005 /* StatusBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000005 /* StatusBarView.swift */; };
 		CC0000000000000000000006 /* FilePaneViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000006 /* FilePaneViewModel.swift */; };
@@ -211,6 +218,13 @@
 		BB0000000000000000000001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		BB0000000000000000000002 /* MainWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowController.swift; sourceTree = "<group>"; };
 		BB0000000000000000000003 /* FilePaneViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePaneViewController.swift; sourceTree = "<group>"; };
+		BB0000000000000000000080 /* FilePaneViewController+Animations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FilePaneViewController+Animations.swift"; sourceTree = "<group>"; };
+		BB0000000000000000000081 /* FilePaneViewController+ContextMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FilePaneViewController+ContextMenu.swift"; sourceTree = "<group>"; };
+		BB0000000000000000000082 /* FilePaneViewController+DragDrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FilePaneViewController+DragDrop.swift"; sourceTree = "<group>"; };
+		BB0000000000000000000083 /* FilePaneViewController+TableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FilePaneViewController+TableView.swift"; sourceTree = "<group>"; };
+		BB0000000000000000000084 /* FilePaneViewController+CollectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FilePaneViewController+CollectionView.swift"; sourceTree = "<group>"; };
+		BB0000000000000000000085 /* FilePaneViewController+Thumbnails.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FilePaneViewController+Thumbnails.swift"; sourceTree = "<group>"; };
+		BB0000000000000000000086 /* FilePaneViewController+Search.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FilePaneViewController+Search.swift"; sourceTree = "<group>"; };
 		BB0000000000000000000004 /* FileTableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileTableView.swift; sourceTree = "<group>"; };
 		BB0000000000000000000005 /* StatusBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarView.swift; sourceTree = "<group>"; };
 		BB0000000000000000000006 /* FilePaneViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePaneViewModel.swift; sourceTree = "<group>"; };
@@ -517,6 +531,13 @@
 			isa = PBXGroup;
 			children = (
 				BB0000000000000000000003 /* FilePaneViewController.swift */,
+				BB0000000000000000000080 /* FilePaneViewController+Animations.swift */,
+				BB0000000000000000000084 /* FilePaneViewController+CollectionView.swift */,
+				BB0000000000000000000081 /* FilePaneViewController+ContextMenu.swift */,
+				BB0000000000000000000082 /* FilePaneViewController+DragDrop.swift */,
+				BB0000000000000000000086 /* FilePaneViewController+Search.swift */,
+				BB0000000000000000000083 /* FilePaneViewController+TableView.swift */,
+				BB0000000000000000000085 /* FilePaneViewController+Thumbnails.swift */,
 				BB0000000000000000000004 /* FileTableView.swift */,
 				BB0000000000000000000057 /* AppearanceTrackingView.swift */,
 				BB0000000000000000000058 /* MarkedRowView.swift */,
@@ -1042,6 +1063,13 @@
 				CC0000000000000000000001 /* AppDelegate.swift in Sources */,
 				CC0000000000000000000002 /* MainWindowController.swift in Sources */,
 				CC0000000000000000000003 /* FilePaneViewController.swift in Sources */,
+				CC0000000000000000000080 /* FilePaneViewController+Animations.swift in Sources */,
+				CC0000000000000000000084 /* FilePaneViewController+CollectionView.swift in Sources */,
+				CC0000000000000000000081 /* FilePaneViewController+ContextMenu.swift in Sources */,
+				CC0000000000000000000082 /* FilePaneViewController+DragDrop.swift in Sources */,
+				CC0000000000000000000086 /* FilePaneViewController+Search.swift in Sources */,
+				CC0000000000000000000083 /* FilePaneViewController+TableView.swift in Sources */,
+				CC0000000000000000000085 /* FilePaneViewController+Thumbnails.swift in Sources */,
 				CC0000000000000000000004 /* FileTableView.swift in Sources */,
 				CC0000000000000000000005 /* StatusBarView.swift in Sources */,
 				CC0000000000000000000006 /* FilePaneViewModel.swift in Sources */,
