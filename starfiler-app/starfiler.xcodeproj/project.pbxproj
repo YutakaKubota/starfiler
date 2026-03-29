@@ -28,6 +28,7 @@
 		A6F98E73AAE0447658073E71 /* SandboxFixtureWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 625BBF22ED7C8DF9F963DCEE /* SandboxFixtureWorkspace.swift */; };
 		A71C439AA3EC244DCEAA171B /* NetworkSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136234B68464371CF5FC3301 /* NetworkSyncService.swift */; };
 		A71C439BA3EC244DCEAA171C /* NetworkSyncService+FinderBadges.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136234B78464371CF5FC3302 /* NetworkSyncService+FinderBadges.swift */; };
+		A71C439FA3EC244DCEAA1720 /* NetworkSyncFinderBadgeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136234BB8464371CF5FC3306 /* NetworkSyncFinderBadgeManager.swift */; };
 		A71C439CA3EC244DCEAA171D /* NetworkSyncService+Transfers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136234B88464371CF5FC3303 /* NetworkSyncService+Transfers.swift */; };
 		A71C439DA3EC244DCEAA171E /* NetworkSyncService+StatePersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136234B98464371CF5FC3304 /* NetworkSyncService+StatePersistence.swift */; };
 		A71C439EA3EC244DCEAA171F /* NetworkSyncService+Diffing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136234BA8464371CF5FC3305 /* NetworkSyncService+Diffing.swift */; };
@@ -220,6 +221,7 @@
 		136234B88464371CF5FC3303 /* NetworkSyncService+Transfers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sync/NetworkSyncService+Transfers.swift"; sourceTree = "<group>"; };
 		136234B98464371CF5FC3304 /* NetworkSyncService+StatePersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sync/NetworkSyncService+StatePersistence.swift"; sourceTree = "<group>"; };
 		136234BA8464371CF5FC3305 /* NetworkSyncService+Diffing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sync/NetworkSyncService+Diffing.swift"; sourceTree = "<group>"; };
+		136234BB8464371CF5FC3306 /* NetworkSyncFinderBadgeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sync/NetworkSyncFinderBadgeManager.swift"; sourceTree = "<group>"; };
 		1DA02617092C30A871EDC359 /* BaseUITestCase.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BaseUITestCase.swift; sourceTree = "<group>"; };
 		203ECE8A9D19B20DB7058AB6 /* TaskCenterPopoverViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskCenterPopoverViewController.swift; sourceTree = "<group>"; };
 		230E7EDA0891551B6E0419BC /* ShortcutRegressionUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShortcutRegressionUITests.swift; sourceTree = "<group>"; };
@@ -475,6 +477,7 @@
 				136234B88464371CF5FC3303 /* NetworkSyncService+Transfers.swift */,
 				136234B98464371CF5FC3304 /* NetworkSyncService+StatePersistence.swift */,
 				136234BA8464371CF5FC3305 /* NetworkSyncService+Diffing.swift */,
+				136234BB8464371CF5FC3306 /* NetworkSyncFinderBadgeManager.swift */,
 			);
 			name = Sync;
 			sourceTree = "<group>";
@@ -1242,6 +1245,7 @@
 				A71C439CA3EC244DCEAA171D /* NetworkSyncService+Transfers.swift in Sources */,
 				A71C439DA3EC244DCEAA171E /* NetworkSyncService+StatePersistence.swift in Sources */,
 				A71C439EA3EC244DCEAA171F /* NetworkSyncService+Diffing.swift in Sources */,
+				A71C439FA3EC244DCEAA1720 /* NetworkSyncFinderBadgeManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

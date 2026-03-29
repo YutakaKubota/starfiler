@@ -1,6 +1,5 @@
 import CoreServices
 import CryptoKit
-import AppKit
 import Foundation
 import Network
 
@@ -40,18 +39,6 @@ final class NetworkSyncService: NetworkSyncControlling {
         case delete(String)
     }
 
-    enum FinderBadgeStatus {
-        case synced
-        case syncing
-        case pending
-        case attention
-    }
-
-    struct FinderBadgeAppearance {
-        let symbolName: String
-        let accentColor: NSColor
-    }
-
     private let serviceType = "_starfiler-sync._tcp"
     let chunkSize = 64 * 1024
     let fileHashThresholdBytes: Int64 = 10 * 1024 * 1024
@@ -85,9 +72,7 @@ final class NetworkSyncService: NetworkSyncControlling {
     var activeTransfersByPath: [String: NetworkSyncTransferActivity] = [:]
     var browserStateVersion = 0
     var isApplyingRemoteChange = false
-    var lastFinderBadgeStatuses: [String: FinderBadgeStatus] = [:]
-    var pendingFinderBadgeStatuses: [String: FinderBadgeStatus?] = [:]
-    var pendingFinderBadgeFlushTask: Task<Void, Never>?
+    let finderBadgeManager = NetworkSyncFinderBadgeManager()
     var suppressLocalRootEventsUntil = Date.distantPast
     private var suppressedLocalRootRetryTask: Task<Void, Never>?
     private var pendingLocalRootVerificationTask: Task<Void, Never>?
@@ -143,6 +128,16 @@ final class NetworkSyncService: NetworkSyncControlling {
                 try await self.securityScopedBookmarkService.startAccessing(rootURL)
                 self.activeRootAccessURL = rootURL
                 self.rootURL = rootURL
+                self.finderBadgeManager.configure(
+                    rootURL: rootURL,
+                    syncDebounceSeconds: self.config.syncDebounceSeconds,
+                    suppressLocalRootEvents: { [weak self] duration in
+                        self?.suppressLocalRootEvents(for: duration)
+                    },
+                    logDuration: { [weak self] operation, startedAt in
+                        self?.logDuration(operation, startedAt: startedAt)
+                    }
+                )
 
                 if !self.fileManager.fileExists(atPath: rootURL.path) {
                     try self.fileManager.createDirectory(at: rootURL, withIntermediateDirectories: true)
@@ -180,10 +175,7 @@ final class NetworkSyncService: NetworkSyncControlling {
     }
 
     func stop() {
-        pendingFinderBadgeFlushTask?.cancel()
-        pendingFinderBadgeFlushTask = nil
-        pendingFinderBadgeStatuses.removeAll()
-        lastFinderBadgeStatuses.removeAll()
+        finderBadgeManager.reset()
         suppressedLocalRootRetryTask?.cancel()
         suppressedLocalRootRetryTask = nil
         pendingLocalRootVerificationTask?.cancel()
@@ -775,7 +767,7 @@ final class NetworkSyncService: NetworkSyncControlling {
         )
         transfers = Array(transfers.prefix(20))
         snapshot.transfers = transfers
-        let badgeStatus: FinderBadgeStatus
+        let badgeStatus: NetworkSyncFinderBadgeManager.FinderBadgeStatus
         switch status {
         case "Completed":
             badgeStatus = .synced
@@ -846,21 +838,6 @@ final class NetworkSyncService: NetworkSyncControlling {
         snapshot.activeTransfers = activeTransfersByPath
         snapshot.browserStateVersion = browserStateVersion
         onSnapshot?(snapshot)
-    }
-
-    // MARK: - Finder Badge Appearance
-
-    nonisolated static func finderBadgeAppearance(for status: FinderBadgeStatus) -> FinderBadgeAppearance {
-        switch status {
-        case .synced:
-            return FinderBadgeAppearance(symbolName: "checkmark", accentColor: .systemGreen)
-        case .syncing:
-            return FinderBadgeAppearance(symbolName: "arrow.triangle.2.circlepath", accentColor: .systemBlue)
-        case .pending:
-            return FinderBadgeAppearance(symbolName: "clock", accentColor: .systemOrange)
-        case .attention:
-            return FinderBadgeAppearance(symbolName: "exclamationmark.triangle.fill", accentColor: .systemRed)
-        }
     }
 
     // MARK: - Device ID
