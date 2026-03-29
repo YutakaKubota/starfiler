@@ -348,6 +348,31 @@ final class ConfigManagerTests: XCTestCase {
         XCTAssertNotEqual(loaded.serverEffectiveRootPath, loaded.clientEffectiveRootPath)
     }
 
+    func testSaveNetworkSyncConfigStoresHomeRelativeClientRootPortably() throws {
+        let config = NetworkSyncConfig(
+            displayName: "Portable",
+            discoveryScope: "portable",
+            serverEnabled: false,
+            serverRootPath: "",
+            clientEnabled: true,
+            clientRootPath: UserPaths.homeDirectoryURL.appendingPathComponent("StarFilerSync").path,
+            clientSyncEntireRoot: true,
+            clientIncludedPaths: [],
+            conflictPolicy: .keepBoth,
+            heartbeatIntervalSeconds: 10,
+            syncDebounceSeconds: 0.5,
+            peers: []
+        )
+
+        try sut.saveNetworkSyncConfig(config)
+        let storedData = try Data(contentsOf: sut.networkSyncConfigURL)
+        let storedObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: storedData) as? [String: Any]
+        )
+
+        XCTAssertEqual(storedObject["clientRootPath"] as? String, "~/StarFilerSync")
+    }
+
     // MARK: - Config Directory
 
     func testConfigDirectoryIsCreated() {

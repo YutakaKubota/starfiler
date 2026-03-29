@@ -214,7 +214,12 @@ struct NetworkSyncConfig: Codable, Sendable {
 
     var clientEffectiveRootPath: String {
         let trimmed = clientRootPath.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? Self.defaultClientRootPath : trimmed
+        let resolved = trimmed.isEmpty ? Self.defaultClientRootPath : trimmed
+        return UserPaths.expandHomeVariables(in: resolved)
+    }
+
+    var clientStoredRootPath: String {
+        Self.portableClientRootPath(clientEffectiveRootPath)
     }
 
     init(
@@ -356,12 +361,41 @@ struct NetworkSyncConfig: Codable, Sendable {
         try container.encode(serverEnabled, forKey: .serverEnabled)
         try container.encode(serverRootPath, forKey: .serverRootPath)
         try container.encode(clientEnabled, forKey: .clientEnabled)
-        try container.encode(clientEffectiveRootPath, forKey: .clientRootPath)
+        try container.encode(clientStoredRootPath, forKey: .clientRootPath)
         try container.encode(clientSyncEntireRoot, forKey: .clientSyncEntireRoot)
         try container.encode(clientIncludedPaths, forKey: .clientIncludedPaths)
         try container.encode(conflictPolicy, forKey: .conflictPolicy)
         try container.encode(heartbeatIntervalSeconds, forKey: .heartbeatIntervalSeconds)
         try container.encode(syncDebounceSeconds, forKey: .syncDebounceSeconds)
         try container.encode(peers, forKey: .peers)
+    }
+
+    private static func portableClientRootPath(_ rawPath: String) -> String {
+        let trimmed = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return trimmed
+        }
+
+        if trimmed.hasPrefix("~") || trimmed.hasPrefix("$HOME") || trimmed.hasPrefix("${HOME}") {
+            return trimmed
+        }
+
+        let homePath = UserPaths.homeDirectoryPath
+
+        if trimmed.hasPrefix(homePath + "/") {
+            return "~" + String(trimmed.dropFirst(homePath.count))
+        }
+
+        let url = URL(fileURLWithPath: trimmed)
+        let components = url.pathComponents
+        if components.count >= 3, components[1] == "Users", components[2] != "Shared" {
+            let suffix = Array(components.dropFirst(3))
+            if suffix.isEmpty {
+                return defaultClientRootPath
+            }
+            return "~/" + suffix.joined(separator: "/")
+        }
+
+        return trimmed
     }
 }
