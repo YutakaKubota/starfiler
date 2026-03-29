@@ -43,6 +43,7 @@
 		CC0000000000000000000089 /* MainWindowController+WindowConstraints.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000089 /* MainWindowController+WindowConstraints.swift */; };
 		CC0000000000000000000003 /* FilePaneViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000003 /* FilePaneViewController.swift */; };
 		CC0000000000000000000080 /* FilePaneViewController+Animations.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000080 /* FilePaneViewController+Animations.swift */; };
+		CC00000000000000000000C2 /* PaneAnimationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000C2 /* PaneAnimationCoordinator.swift */; };
 		CC0000000000000000000081 /* FilePaneViewController+ContextMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000081 /* FilePaneViewController+ContextMenu.swift */; };
 		CC0000000000000000000082 /* FilePaneViewController+DragDrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000082 /* FilePaneViewController+DragDrop.swift */; };
 		CC0000000000000000000083 /* FilePaneViewController+TableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000083 /* FilePaneViewController+TableView.swift */; };
@@ -247,6 +248,7 @@
 		BB0000000000000000000089 /* MainWindowController+WindowConstraints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MainWindowController+WindowConstraints.swift"; sourceTree = "<group>"; };
 		BB0000000000000000000003 /* FilePaneViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePaneViewController.swift; sourceTree = "<group>"; };
 		BB0000000000000000000080 /* FilePaneViewController+Animations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FilePaneViewController+Animations.swift"; sourceTree = "<group>"; };
+		BB00000000000000000000C2 /* PaneAnimationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneAnimationCoordinator.swift; sourceTree = "<group>"; };
 		BB0000000000000000000081 /* FilePaneViewController+ContextMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FilePaneViewController+ContextMenu.swift"; sourceTree = "<group>"; };
 		BB0000000000000000000082 /* FilePaneViewController+DragDrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FilePaneViewController+DragDrop.swift"; sourceTree = "<group>"; };
 		BB0000000000000000000083 /* FilePaneViewController+TableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FilePaneViewController+TableView.swift"; sourceTree = "<group>"; };
@@ -583,6 +585,7 @@
 				BB0000000000000000000086 /* FilePaneViewController+Search.swift */,
 				BB0000000000000000000083 /* FilePaneViewController+TableView.swift */,
 				BB0000000000000000000085 /* FilePaneViewController+Thumbnails.swift */,
+				BB00000000000000000000C2 /* PaneAnimationCoordinator.swift */,
 				BB0000000000000000000004 /* FileTableView.swift */,
 				BB0000000000000000000057 /* AppearanceTrackingView.swift */,
 				BB0000000000000000000058 /* MarkedRowView.swift */,
@@ -1121,6 +1124,7 @@
 				CC0000000000000000000089 /* MainWindowController+WindowConstraints.swift in Sources */,
 				CC0000000000000000000003 /* FilePaneViewController.swift in Sources */,
 				CC0000000000000000000080 /* FilePaneViewController+Animations.swift in Sources */,
+				CC00000000000000000000C2 /* PaneAnimationCoordinator.swift in Sources */,
 				CC0000000000000000000084 /* FilePaneViewController+CollectionView.swift in Sources */,
 				CC0000000000000000000081 /* FilePaneViewController+ContextMenu.swift in Sources */,
 				CC0000000000000000000082 /* FilePaneViewController+DragDrop.swift in Sources */,

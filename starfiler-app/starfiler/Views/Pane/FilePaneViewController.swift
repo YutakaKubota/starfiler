@@ -307,6 +307,7 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
     private var shortcutGuideEnabled = false
     private let disableAnimationsForUITest = ProcessInfo.processInfo.arguments.contains("--disable-animations")
     weak var lastCursorRippleLayer: CALayer?
+    let animationCoordinator = PaneAnimationCoordinator()
     var isSearchFieldFocused = false
     private var pendingBreadcrumbDirectoryURL: URL?
     private var lastAppliedBreadcrumbDirectoryURL: URL?
@@ -361,6 +362,9 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
             starEffectsEnabled = false
             animationEffectSettings = .allDisabled
         }
+        animationCoordinator.starEffectsEnabled = starEffectsEnabled
+        animationCoordinator.animationEffectSettings = animationEffectSettings
+        animationCoordinator.palette = filerTheme.palette
         configureContainerAppearance()
         configureTableView()
         configureCollectionView()
@@ -452,6 +456,7 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
 
     func setStarEffectsEnabled(_ enabled: Bool) {
         starEffectsEnabled = disableAnimationsForUITest ? false : enabled
+        animationCoordinator.starEffectsEnabled = starEffectsEnabled
         tableView.reloadData()
         mediaCollectionView.reloadData()
         updateActiveAppearance()
@@ -459,6 +464,7 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
 
     func setAnimationEffectSettings(_ settings: AnimationEffectSettings) {
         animationEffectSettings = disableAnimationsForUITest ? .allDisabled : settings
+        animationCoordinator.animationEffectSettings = animationEffectSettings
     }
 
     func setShortcutGuideEnabled(_ enabled: Bool) {
@@ -689,6 +695,7 @@ final class FilePaneViewController: NSViewController, NSTableViewDataSource, NST
     func applyTheme(_ theme: FilerTheme, backgroundOpacity: CGFloat = 1.0) {
         filerTheme = theme
         self.backgroundOpacity = backgroundOpacity
+        animationCoordinator.palette = theme.palette
         tableView.reloadData()
         mediaCollectionView.reloadData()
         updateActiveAppearance()
