@@ -1,17 +1,22 @@
 import Foundation
 import Observation
 
-private actor SelectiveSyncBrowserDataLoader {
-    struct Snapshot: Sendable {
-        let entries: [NetworkSyncFileEntry]
-        let localAvailability: Set<String>
-    }
+struct SelectiveSyncBrowserSnapshot: Sendable {
+    let entries: [NetworkSyncFileEntry]
+    let localAvailability: Set<String>
+}
 
-    func load(stateURL: URL) -> Snapshot {
+protocol SelectiveSyncBrowserDataLoading: Sendable {
+    func load(stateURL: URL) async -> SelectiveSyncBrowserSnapshot
+}
+
+private actor SelectiveSyncBrowserDataLoader: SelectiveSyncBrowserDataLoading {
+
+    func load(stateURL: URL) async -> SelectiveSyncBrowserSnapshot {
         guard let state = loadClientState(from: stateURL) else {
-            return Snapshot(entries: [], localAvailability: [])
+            return SelectiveSyncBrowserSnapshot(entries: [], localAvailability: [])
         }
-        return Snapshot(
+        return SelectiveSyncBrowserSnapshot(
             entries: state.knownEntries.values.filter { !$0.deleted },
             localAvailability: Set(state.materializedPaths.map(Self.normalizeRelativePath))
         )
@@ -57,6 +62,8 @@ struct SelectiveSyncBrowserNode: Identifiable, Hashable, Sendable {
     let runtimeState: SelectiveSyncRuntimeState
     let statusText: String
     let sizeText: String
+    let modifiedAt: Date?
+    let modifiedText: String
     let isLocalAvailable: Bool
     let isRemoteAvailable: Bool
     let children: [SelectiveSyncBrowserNode]
@@ -88,20 +95,36 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
     var selectiveSyncNodes: [SelectiveSyncBrowserNode] = []
     var selectiveSyncSummary: String = "Client syncs the whole root."
     var selectiveSyncHint: String = "Enable the client role to browse the latest server snapshot."
+    var isSelectiveSyncRefreshing = false
+    var selectiveSyncLastRefreshedAt: Date?
 
     private let configManager: ConfigManager
     private let peerSummaryDateFormatter: DateFormatter
+    private let selectiveSyncDateFormatter: DateFormatter
     private let service: any NetworkSyncControlling
     private var config: NetworkSyncConfig
     private var activeTransfers: [String: NetworkSyncTransferActivity] = [:]
     private let byteCountFormatter: ByteCountFormatter
     private var changeObservers: [UUID: @MainActor () -> Void] = [:]
-    private let selectiveSyncDataLoader = SelectiveSyncBrowserDataLoader()
+    private let selectiveSyncDataLoader: any SelectiveSyncBrowserDataLoading
     private var cachedAvailableEntries: [NetworkSyncFileEntry] = []
     private var cachedLocalAvailability: Set<String> = []
     private var selectiveSyncRefreshTask: Task<Void, Never>?
     private var selectiveSyncRefreshGeneration = 0
     private var lastSelectiveSyncBrowserStateVersion = 0
+
+    var selectiveSyncActivityText: String {
+        if isSelectiveSyncRefreshing {
+            return "Refreshing folders and files from the latest snapshot..."
+        }
+        if let selectiveSyncLastRefreshedAt {
+            return "Last updated: \(selectiveSyncDateFormatter.string(from: selectiveSyncLastRefreshedAt))"
+        }
+        if clientEnabled {
+            return "Folders and files have not been loaded yet."
+        }
+        return "Enable the client role to load folders and files."
+    }
 
     var isEnabled: Bool {
         serverEnabled || clientEnabled
@@ -111,15 +134,20 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         configManager: ConfigManager = ConfigManager(),
         securityScopedBookmarkService: any SecurityScopedBookmarkProviding = SecurityScopedBookmarkService.shared,
         fileManager: FileManager = .default,
-        service: (any NetworkSyncControlling)? = nil
+        service: (any NetworkSyncControlling)? = nil,
+        selectiveSyncDataLoader: (any SelectiveSyncBrowserDataLoading)? = nil
     ) {
         self.configManager = configManager
         self.peerSummaryDateFormatter = DateFormatter()
         peerSummaryDateFormatter.dateStyle = .short
         peerSummaryDateFormatter.timeStyle = .short
+        self.selectiveSyncDateFormatter = DateFormatter()
+        selectiveSyncDateFormatter.dateStyle = .short
+        selectiveSyncDateFormatter.timeStyle = .short
         self.byteCountFormatter = ByteCountFormatter()
         byteCountFormatter.countStyle = .file
         byteCountFormatter.includesUnit = true
+        self.selectiveSyncDataLoader = selectiveSyncDataLoader ?? SelectiveSyncBrowserDataLoader()
 
         let loadedConfig = configManager.loadNetworkSyncConfig()
         self.config = loadedConfig
@@ -161,15 +189,16 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         heartbeatIntervalSeconds = config.heartbeatIntervalSeconds
         syncDebounceSeconds = config.syncDebounceSeconds
         clientSyncEntireRoot = config.clientSyncEntireRoot
+        statusMessage = "Reloaded from disk"
         refreshPeerSummaries()
         refreshSelectiveSyncBrowser(needsDiskRefresh: true, notifyOnChange: true)
-        statusMessage = "Reloaded from disk"
         if config.isEnabled {
             service.reload(config: config)
         } else {
             service.stop()
             applySnapshot(.disabled)
         }
+        notifyDidChange()
     }
 
     func save() {
@@ -221,6 +250,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
                 service.stop()
                 applySnapshot(.disabled)
             }
+            notifyDidChange()
         } catch {
             statusMessage = error.localizedDescription
             statusDetail = error.localizedDescription
@@ -234,8 +264,10 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
     }
 
     func requestRefresh() {
+        statusMessage = "Refreshing folders and files..."
         service.requestRefresh()
         refreshSelectiveSyncBrowser(needsDiskRefresh: true, notifyOnChange: true)
+        notifyDidChange()
     }
 
     func stop() {
@@ -401,6 +433,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
             let loader = selectiveSyncDataLoader
 
             selectiveSyncRefreshTask?.cancel()
+            beginSelectiveSyncRefresh()
             selectiveSyncRefreshTask = Task { [weak self] in
                 let startedAt = CFAbsoluteTimeGetCurrent()
                 guard let self else { return }
@@ -411,23 +444,36 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
                     }
                     self.cachedAvailableEntries = snapshot.entries
                     self.cachedLocalAvailability = snapshot.localAvailability
-                    self.applySelectiveSyncBrowserCache(logLabel: "disk refresh", startedAt: startedAt, notifyOnChange: notifyOnChange)
+                    self.applySelectiveSyncBrowserCache(
+                        logLabel: "disk refresh",
+                        startedAt: startedAt,
+                        completedAt: Date(),
+                        notifyOnChange: notifyOnChange
+                    )
                 }
             }
             return
         }
 
-        applySelectiveSyncBrowserCache(logLabel: "cached refresh", startedAt: CFAbsoluteTimeGetCurrent(), notifyOnChange: notifyOnChange)
+        applySelectiveSyncBrowserCache(
+            logLabel: "cached refresh",
+            startedAt: CFAbsoluteTimeGetCurrent(),
+            completedAt: nil,
+            notifyOnChange: notifyOnChange
+        )
     }
 
     private func applySelectiveSyncBrowserCache(
         logLabel: String,
         startedAt: CFAbsoluteTime,
+        completedAt: Date?,
         notifyOnChange: Bool
     ) {
         let previousNodes = selectiveSyncNodes
         let previousSummary = selectiveSyncSummary
         let previousHint = selectiveSyncHint
+        let previousRefreshState = isSelectiveSyncRefreshing
+        let previousLastRefreshedAt = selectiveSyncLastRefreshedAt
 
         let roots = buildTree(entries: cachedAvailableEntries, localAvailability: cachedLocalAvailability)
         selectiveSyncNodes = roots.map { materializeNode($0).node }
@@ -454,10 +500,18 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
 
         logSelectiveSyncRefresh(label: logLabel, startedAt: startedAt)
 
-        if notifyOnChange &&
-            (previousNodes != selectiveSyncNodes ||
-             previousSummary != selectiveSyncSummary ||
-             previousHint != selectiveSyncHint) {
+        if let completedAt {
+            isSelectiveSyncRefreshing = false
+            selectiveSyncLastRefreshedAt = completedAt
+        }
+
+        let didChange = previousNodes != selectiveSyncNodes ||
+            previousSummary != selectiveSyncSummary ||
+            previousHint != selectiveSyncHint
+        let refreshStateChanged = previousRefreshState != isSelectiveSyncRefreshing ||
+            previousLastRefreshedAt != selectiveSyncLastRefreshedAt
+
+        if refreshStateChanged || (notifyOnChange && didChange) {
             notifyDidChange()
         }
     }
@@ -498,6 +552,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
                 name: component,
                 isDirectory: isDirectory,
                 directBytes: isLeaf ? entry.size : 0,
+                modificationTimestamp: isLeaf ? entry.modificationTimestamp : nil,
                 isRemoteAvailable: isLeaf,
                 isLocalAvailable: localAvailability.contains(currentPath),
                 children: [:]
@@ -508,6 +563,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
                 name: node.name,
                 isDirectory: node.isDirectory || isDirectory,
                 directBytes: isLeaf ? entry.size : node.directBytes,
+                modificationTimestamp: isLeaf ? entry.modificationTimestamp : node.modificationTimestamp,
                 isRemoteAvailable: node.isRemoteAvailable || isLeaf,
                 isLocalAvailable: node.isLocalAvailable || localAvailability.contains(currentPath),
                 children: node.children
@@ -543,6 +599,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
             name: component,
             isDirectory: isLeaf ? entry.isDirectory : true,
             directBytes: isLeaf ? entry.size : 0,
+            modificationTimestamp: isLeaf ? entry.modificationTimestamp : nil,
             isRemoteAvailable: isLeaf,
             isLocalAvailable: localAvailability.contains(nextPath),
             children: [:]
@@ -553,6 +610,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
             name: node.name,
             isDirectory: node.isDirectory || !isLeaf || entry.isDirectory,
             directBytes: isLeaf ? entry.size : node.directBytes,
+            modificationTimestamp: isLeaf ? entry.modificationTimestamp : node.modificationTimestamp,
             isRemoteAvailable: node.isRemoteAvailable || isLeaf,
             isLocalAvailable: node.isLocalAvailable || localAvailability.contains(nextPath),
             children: node.children
@@ -566,6 +624,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
                 name: updatedNode.name,
                 isDirectory: updatedNode.isDirectory,
                 directBytes: updatedNode.directBytes,
+                modificationTimestamp: updatedNode.modificationTimestamp,
                 isRemoteAvailable: updatedNode.isRemoteAvailable,
                 isLocalAvailable: updatedNode.isLocalAvailable,
                 children: nestedChildren
@@ -581,9 +640,13 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         let aggregatedBytes = node.directBytes + materializedChildren.reduce(into: Int64(0)) { partial, element in
             partial += element.aggregateBytes
         }
+        let latestModificationTimestamp = ([node.modificationTimestamp] + materializedChildren.map(\.latestModificationTimestamp))
+            .compactMap { $0 }
+            .max()
         let selectionState = selectionState(for: node.path, children: children)
         let runtimeState = runtimeState(for: node, selectionState: selectionState, children: children)
         let statusText = statusText(for: runtimeState, node: node)
+        let modifiedAt = latestModificationTimestamp.map { Date(timeIntervalSince1970: $0) }
 
         let materializedNode = SelectiveSyncBrowserNode(
             id: node.path,
@@ -594,11 +657,17 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
             runtimeState: runtimeState,
             statusText: statusText,
             sizeText: byteCountFormatter.string(fromByteCount: aggregatedBytes),
+            modifiedAt: modifiedAt,
+            modifiedText: modifiedAt.map { selectiveSyncDateFormatter.string(from: $0) } ?? "—",
             isLocalAvailable: node.isLocalAvailable,
             isRemoteAvailable: node.isRemoteAvailable,
             children: children
         )
-        return MaterializedNode(node: materializedNode, aggregateBytes: aggregatedBytes)
+        return MaterializedNode(
+            node: materializedNode,
+            aggregateBytes: aggregatedBytes,
+            latestModificationTimestamp: latestModificationTimestamp
+        )
     }
 
     private func selectionState(for path: String, children: [SelectiveSyncBrowserNode]) -> SelectiveSyncSelectionState {
@@ -809,6 +878,14 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
         return snapshot.browserStateVersion != lastSelectiveSyncBrowserStateVersion
     }
 
+    private func beginSelectiveSyncRefresh() {
+        guard !isSelectiveSyncRefreshing else {
+            return
+        }
+        isSelectiveSyncRefreshing = true
+        notifyDidChange()
+    }
+
     private func logSelectiveSyncRefresh(label: String, startedAt: CFAbsoluteTime) {
         let elapsed = (CFAbsoluteTimeGetCurrent() - startedAt) * 1_000
         NSLog("NetworkSyncViewModel selective sync %@ completed in %.1f ms", label, elapsed)
@@ -820,6 +897,7 @@ private struct TreeNode: Hashable, Sendable {
     let name: String
     let isDirectory: Bool
     let directBytes: Int64
+    let modificationTimestamp: TimeInterval?
     let isRemoteAvailable: Bool
     let isLocalAvailable: Bool
     let children: [String: TreeNode]
@@ -831,6 +909,7 @@ private struct TreeNode: Hashable, Sendable {
                 name: name,
                 isDirectory: isDirectory,
                 directBytes: directBytes,
+                modificationTimestamp: modificationTimestamp,
                 isRemoteAvailable: isRemoteAvailable,
                 isLocalAvailable: isLocalAvailable,
                 children: newChildren
@@ -849,6 +928,7 @@ private struct TreeNode: Hashable, Sendable {
             name: name,
             isDirectory: isDirectory,
             directBytes: directBytes,
+            modificationTimestamp: modificationTimestamp,
             isRemoteAvailable: isRemoteAvailable,
             isLocalAvailable: isLocalAvailable,
             children: updatedChildren
@@ -859,4 +939,5 @@ private struct TreeNode: Hashable, Sendable {
 private struct MaterializedNode: Sendable {
     let node: SelectiveSyncBrowserNode
     let aggregateBytes: Int64
+    let latestModificationTimestamp: TimeInterval?
 }

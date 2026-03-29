@@ -33,6 +33,11 @@ extension NetworkSyncSettingsViewController: NSOutlineViewDataSource, NSOutlineV
             cell.textField?.stringValue = node.statusText
             cell.textField?.textColor = statusColor(for: node.runtimeState)
             return cell
+        case .selectiveSyncModifiedColumn:
+            let cell = makeModifiedCell(for: outlineView)
+            cell.textField?.stringValue = node.modifiedText
+            cell.textField?.textColor = node.modifiedAt == nil ? .tertiaryLabelColor : .secondaryLabelColor
+            return cell
         case .selectiveSyncSizeColumn:
             let cell = makeSizeCell(for: outlineView)
             cell.textField?.stringValue = node.sizeText
@@ -148,6 +153,30 @@ extension NetworkSyncSettingsViewController: NSOutlineViewDataSource, NSOutlineV
 
         return cell
     }
+
+    func makeModifiedCell(for outlineView: NSOutlineView) -> NSTableCellView {
+        if let existing = outlineView.makeView(withIdentifier: .selectiveSyncModifiedCell, owner: self) as? NSTableCellView {
+            return existing
+        }
+
+        let cell = NSTableCellView()
+        cell.identifier = .selectiveSyncModifiedCell
+
+        let label = NSTextField(labelWithString: "")
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        label.lineBreakMode = .byTruncatingTail
+        cell.textField = label
+        cell.addSubview(label)
+
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: cell.leadingAnchor),
+            label.trailingAnchor.constraint(equalTo: cell.trailingAnchor),
+            label.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+        ])
+
+        return cell
+    }
 }
 
 final class SelectiveSyncNameCellView: NSTableCellView {
@@ -229,8 +258,10 @@ final class SelectiveSyncStatusCellView: NSTableCellView {
 extension NSUserInterfaceItemIdentifier {
     static let selectiveSyncNameColumn = NSUserInterfaceItemIdentifier("SelectiveSyncNameColumn")
     static let selectiveSyncStatusColumn = NSUserInterfaceItemIdentifier("SelectiveSyncStatusColumn")
+    static let selectiveSyncModifiedColumn = NSUserInterfaceItemIdentifier("SelectiveSyncModifiedColumn")
     static let selectiveSyncSizeColumn = NSUserInterfaceItemIdentifier("SelectiveSyncSizeColumn")
     static let selectiveSyncNameCell = NSUserInterfaceItemIdentifier("SelectiveSyncNameCell")
     static let selectiveSyncStatusCell = NSUserInterfaceItemIdentifier("SelectiveSyncStatusCell")
+    static let selectiveSyncModifiedCell = NSUserInterfaceItemIdentifier("SelectiveSyncModifiedCell")
     static let selectiveSyncSizeCell = NSUserInterfaceItemIdentifier("SelectiveSyncSizeCell")
 }

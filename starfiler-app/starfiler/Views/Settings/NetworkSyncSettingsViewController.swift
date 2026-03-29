@@ -154,7 +154,8 @@ final class NetworkSyncSettingsViewController: NSViewController {
         selectiveSyncActivityIndicator.translatesAutoresizingMaskIntoConstraints = false
         selectiveSyncActivityIndicator.style = .spinning
         selectiveSyncActivityIndicator.controlSize = .small
-        selectiveSyncActivityIndicator.isDisplayedWhenStopped = false
+        selectiveSyncActivityIndicator.isDisplayedWhenStopped = true
+        selectiveSyncActivityIndicator.alphaValue = 0
 
         selectiveSyncActivityLabel.translatesAutoresizingMaskIntoConstraints = false
         selectiveSyncActivityLabel.font = .systemFont(ofSize: 11)
@@ -417,9 +418,11 @@ final class NetworkSyncSettingsViewController: NSViewController {
         }
         setStringValue(statusLabel, viewModel.statusMessage)
         if viewModel.isSelectiveSyncRefreshing {
+            selectiveSyncActivityIndicator.alphaValue = 1
             selectiveSyncActivityIndicator.startAnimation(nil)
         } else {
             selectiveSyncActivityIndicator.stopAnimation(nil)
+            selectiveSyncActivityIndicator.alphaValue = 0
         }
 
         refreshSelectiveSyncOutlineIfNeeded()
@@ -551,6 +554,8 @@ final class NetworkSyncSettingsViewController: NSViewController {
         row.spacing = 6
         row.alignment = .centerY
         row.translatesAutoresizingMaskIntoConstraints = false
+        selectiveSyncActivityIndicator.widthAnchor.constraint(equalToConstant: 12).isActive = true
+        selectiveSyncActivityIndicator.heightAnchor.constraint(equalToConstant: 12).isActive = true
         return row
     }
 }

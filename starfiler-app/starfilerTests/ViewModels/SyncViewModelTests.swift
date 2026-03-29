@@ -66,13 +66,14 @@ final class SyncViewModelTests: XCTestCase {
     private func makeNetworkSyncEntry(
         relativePath: String,
         isDirectory: Bool,
-        size: Int64 = 0
+        size: Int64 = 0,
+        modificationTimestamp: TimeInterval = Date().timeIntervalSince1970
     ) -> NetworkSyncFileEntry {
         NetworkSyncFileEntry(
             relativePath: relativePath,
             isDirectory: isDirectory,
             size: size,
-            modificationTimestamp: Date().timeIntervalSince1970,
+            modificationTimestamp: modificationTimestamp,
             contentHash: isDirectory ? nil : UUID().uuidString,
             revision: 1,
             deleted: false
@@ -520,6 +521,57 @@ final class SyncViewModelTests: XCTestCase {
         }
     }
 
+    func testNetworkSyncViewModelTracksSelectiveSyncRefreshProgressAndModifiedDate() async throws {
+        let rootURL = tempConfigDir.appendingPathComponent("NetworkSyncRefreshStatusRoot", isDirectory: true)
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+
+        let modifiedAt = Date(timeIntervalSince1970: 1_711_700_000)
+        let entries = [
+            makeNetworkSyncEntry(
+                relativePath: "docs/readme.md",
+                isDirectory: false,
+                size: 12,
+                modificationTimestamp: modifiedAt.timeIntervalSince1970
+            ),
+        ]
+        let config = NetworkSyncConfig(
+            clientEnabled: true,
+            clientRootPath: rootURL.path,
+            clientSyncEntireRoot: false,
+            clientIncludedPaths: ["docs"]
+        )
+        try configManager.saveNetworkSyncConfig(config)
+
+        let loader = MockSelectiveSyncBrowserDataLoader(
+            snapshot: SelectiveSyncBrowserSnapshot(
+                entries: entries,
+                localAvailability: ["docs/readme.md"]
+            ),
+            delay: .milliseconds(200)
+        )
+        let service = MockNetworkSyncController()
+        let sut = NetworkSyncViewModel(
+            configManager: configManager,
+            service: service,
+            selectiveSyncDataLoader: loader
+        )
+
+        XCTAssertTrue(sut.isSelectiveSyncRefreshing)
+        XCTAssertTrue(sut.selectiveSyncActivityText.contains("Refreshing"))
+        XCTAssertNil(sut.selectiveSyncLastRefreshedAt)
+
+        await waitForCondition(description: "Selective sync refresh status completes") {
+            guard let firstNode = sut.selectiveSyncNodes.first?.children.first else {
+                return false
+            }
+            return !sut.isSelectiveSyncRefreshing &&
+                sut.selectiveSyncLastRefreshedAt != nil &&
+                firstNode.modifiedAt == modifiedAt
+        }
+
+        XCTAssertTrue(sut.selectiveSyncActivityText.contains("Last updated:"))
+    }
+
     func testNetworkSyncSettingsViewControllerPreservesCollapsedOutlineStateAcrossUpdates() async throws {
         let rootURL = tempConfigDir.appendingPathComponent("NetworkSyncOutlineRoot", isDirectory: true)
         try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
@@ -572,6 +624,39 @@ final class SyncViewModelTests: XCTestCase {
             return outlineView.isItemExpanded(docsNode) && !outlineView.isItemExpanded(refreshedImagesNode)
         }
     }
+
+    func testNetworkSyncSettingsViewControllerShowsModifiedColumn() async throws {
+        let rootURL = tempConfigDir.appendingPathComponent("NetworkSyncModifiedColumnRoot", isDirectory: true)
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+
+        let entries = [
+            makeNetworkSyncEntry(relativePath: "docs/file.txt", isDirectory: false, size: 4),
+        ]
+        let config = NetworkSyncConfig(
+            clientEnabled: true,
+            clientRootPath: rootURL.path,
+            clientSyncEntireRoot: false,
+            clientIncludedPaths: ["docs"]
+        )
+        try configManager.saveNetworkSyncConfig(config)
+        try writeNetworkSyncState(
+            rootPath: config.clientEffectiveRootPath,
+            entries: entries,
+            materializedPaths: ["docs/file.txt"]
+        )
+
+        let controller = NetworkSyncSettingsViewController(
+            viewModel: NetworkSyncViewModel(
+                configManager: configManager,
+                service: MockNetworkSyncController()
+            )
+        )
+        controller.loadViewIfNeeded()
+
+        XCTAssertTrue(
+            controller.selectiveSyncOutlineView.tableColumns.contains { $0.identifier == .selectiveSyncModifiedColumn }
+        )
+    }
 }
 
 @MainActor
@@ -591,5 +676,22 @@ private final class MockNetworkSyncController: NetworkSyncControlling {
 
     func emit(_ snapshot: NetworkSyncRuntimeSnapshot) {
         onSnapshot?(snapshot)
+    }
+}
+
+private actor MockSelectiveSyncBrowserDataLoader: SelectiveSyncBrowserDataLoading {
+    private let snapshot: SelectiveSyncBrowserSnapshot
+    private let delay: Duration
+
+    init(snapshot: SelectiveSyncBrowserSnapshot, delay: Duration = .zero) {
+        self.snapshot = snapshot
+        self.delay = delay
+    }
+
+    func load(stateURL _: URL) async -> SelectiveSyncBrowserSnapshot {
+        if delay > .zero {
+            try? await Task.sleep(for: delay)
+        }
+        return snapshot
     }
 }
