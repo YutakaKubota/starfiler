@@ -161,6 +161,8 @@ final class KeybindingsViewController: NSViewController, NSTableViewDataSource, 
     }
 
     private func configureLayout() {
+        let outerInset: CGFloat = 24
+
         view.addSubview(segmentedControl)
         view.addSubview(searchField)
         view.addSubview(scrollView)
@@ -168,23 +170,23 @@ final class KeybindingsViewController: NSViewController, NSTableViewDataSource, 
         view.addSubview(openConfigButton)
 
         NSLayoutConstraint.activate([
-            segmentedControl.topAnchor.constraint(equalTo: view.topAnchor, constant: 12),
+            segmentedControl.topAnchor.constraint(equalTo: view.topAnchor, constant: outerInset),
             segmentedControl.centerXAnchor.constraint(equalTo: view.centerXAnchor),
 
             searchField.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: 8),
-            searchField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
-            searchField.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+            searchField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: outerInset),
+            searchField.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -outerInset),
 
             scrollView.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: 8),
-            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
-            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: outerInset),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -outerInset),
             scrollView.bottomAnchor.constraint(equalTo: resetButton.topAnchor, constant: -8),
 
-            resetButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
-            resetButton.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -12),
+            resetButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: outerInset),
+            resetButton.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -outerInset),
 
-            openConfigButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
-            openConfigButton.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -12),
+            openConfigButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -outerInset),
+            openConfigButton.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -outerInset),
         ])
     }
 

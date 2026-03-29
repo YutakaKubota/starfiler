@@ -25,6 +25,8 @@ final class NetworkSyncSettingsViewController: NSViewController {
     private let collapseAllButton = NSButton(title: "Collapse All", target: nil, action: nil)
     private let selectiveSyncSummaryLabel = NSTextField(wrappingLabelWithString: "")
     private let selectiveSyncHintLabel = NSTextField(wrappingLabelWithString: "")
+    private let selectiveSyncActivityIndicator = NSProgressIndicator()
+    private let selectiveSyncActivityLabel = NSTextField(labelWithString: "")
     let conflictPolicyPopup = NSPopUpButton()
     let heartbeatField = NSTextField()
     let debounceField = NSTextField()
@@ -149,6 +151,16 @@ final class NetworkSyncSettingsViewController: NSViewController {
         selectiveSyncHintLabel.textColor = .secondaryLabelColor
         selectiveSyncHintLabel.maximumNumberOfLines = 3
 
+        selectiveSyncActivityIndicator.translatesAutoresizingMaskIntoConstraints = false
+        selectiveSyncActivityIndicator.style = .spinning
+        selectiveSyncActivityIndicator.controlSize = .small
+        selectiveSyncActivityIndicator.isDisplayedWhenStopped = false
+
+        selectiveSyncActivityLabel.translatesAutoresizingMaskIntoConstraints = false
+        selectiveSyncActivityLabel.font = .systemFont(ofSize: 11)
+        selectiveSyncActivityLabel.textColor = .secondaryLabelColor
+        selectiveSyncActivityLabel.lineBreakMode = .byTruncatingTail
+
         conflictPolicyPopup.translatesAutoresizingMaskIntoConstraints = false
         for policy in NetworkSyncConflictPolicy.allCases {
             conflictPolicyPopup.addItem(withTitle: policy.displayName)
@@ -193,6 +205,11 @@ final class NetworkSyncSettingsViewController: NSViewController {
         statusColumn.resizingMask = [.autoresizingMask]
         statusColumn.width = 240
 
+        let modifiedColumn = NSTableColumn(identifier: .selectiveSyncModifiedColumn)
+        modifiedColumn.title = "Modified"
+        modifiedColumn.resizingMask = [.autoresizingMask]
+        modifiedColumn.width = 160
+
         let sizeColumn = NSTableColumn(identifier: .selectiveSyncSizeColumn)
         sizeColumn.title = "Size"
         sizeColumn.resizingMask = [.autoresizingMask]
@@ -201,6 +218,7 @@ final class NetworkSyncSettingsViewController: NSViewController {
         selectiveSyncOutlineView.translatesAutoresizingMaskIntoConstraints = false
         selectiveSyncOutlineView.addTableColumn(nameColumn)
         selectiveSyncOutlineView.addTableColumn(statusColumn)
+        selectiveSyncOutlineView.addTableColumn(modifiedColumn)
         selectiveSyncOutlineView.addTableColumn(sizeColumn)
         selectiveSyncOutlineView.outlineTableColumn = nameColumn
         selectiveSyncOutlineView.headerView = NSTableHeaderView()
@@ -254,6 +272,7 @@ final class NetworkSyncSettingsViewController: NSViewController {
             selectiveControls,
             selectiveSyncSummaryLabel,
             selectiveSyncHintLabel,
+            selectiveSyncActivityRow(),
             selectiveSyncScrollView,
         ])
         selectiveSyncBody.orientation = .vertical
@@ -328,8 +347,20 @@ final class NetworkSyncSettingsViewController: NSViewController {
         formScrollView.translatesAutoresizingMaskIntoConstraints = false
         formScrollView.drawsBackground = false
         formScrollView.hasVerticalScroller = true
-        formScrollView.documentView = content
+        let documentView = NSView()
+        documentView.translatesAutoresizingMaskIntoConstraints = false
+        documentView.addSubview(content)
+        formScrollView.documentView = documentView
         view.addSubview(formScrollView)
+
+        let horizontalInset: CGFloat = 28
+        let verticalInset: CGFloat = 28
+        let maxContentWidth: CGFloat = 940
+        let flexibleWidthConstraint = content.widthAnchor.constraint(
+            equalTo: documentView.widthAnchor,
+            constant: -(horizontalInset * 2)
+        )
+        flexibleWidthConstraint.priority = .defaultHigh
 
         NSLayoutConstraint.activate([
             formScrollView.topAnchor.constraint(equalTo: view.topAnchor),
@@ -337,11 +368,20 @@ final class NetworkSyncSettingsViewController: NSViewController {
             formScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             formScrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-            content.topAnchor.constraint(equalTo: formScrollView.contentView.topAnchor, constant: 20),
-            content.leadingAnchor.constraint(equalTo: formScrollView.contentView.leadingAnchor, constant: 20),
-            content.trailingAnchor.constraint(equalTo: formScrollView.contentView.trailingAnchor, constant: -20),
-            content.bottomAnchor.constraint(equalTo: formScrollView.contentView.bottomAnchor, constant: -20),
-            content.widthAnchor.constraint(equalTo: formScrollView.contentView.widthAnchor, constant: -40),
+            documentView.topAnchor.constraint(equalTo: formScrollView.contentView.topAnchor),
+            documentView.leadingAnchor.constraint(equalTo: formScrollView.contentView.leadingAnchor),
+            documentView.trailingAnchor.constraint(equalTo: formScrollView.contentView.trailingAnchor),
+            documentView.bottomAnchor.constraint(equalTo: formScrollView.contentView.bottomAnchor),
+            documentView.widthAnchor.constraint(equalTo: formScrollView.contentView.widthAnchor),
+            documentView.heightAnchor.constraint(greaterThanOrEqualTo: formScrollView.contentView.heightAnchor),
+
+            content.topAnchor.constraint(equalTo: documentView.topAnchor, constant: verticalInset),
+            content.leadingAnchor.constraint(greaterThanOrEqualTo: documentView.leadingAnchor, constant: horizontalInset),
+            content.trailingAnchor.constraint(lessThanOrEqualTo: documentView.trailingAnchor, constant: -horizontalInset),
+            content.centerXAnchor.constraint(equalTo: documentView.centerXAnchor),
+            content.bottomAnchor.constraint(lessThanOrEqualTo: documentView.bottomAnchor, constant: -verticalInset),
+            content.widthAnchor.constraint(lessThanOrEqualToConstant: maxContentWidth),
+            flexibleWidthConstraint,
             selectiveSyncBody.widthAnchor.constraint(equalTo: content.widthAnchor),
         ])
     }
@@ -367,6 +407,7 @@ final class NetworkSyncSettingsViewController: NSViewController {
         setState(syncEntireRootCheckBox, viewModel.clientSyncEntireRoot ? .on : .off)
         setStringValue(selectiveSyncSummaryLabel, "Selection: \(viewModel.selectiveSyncSummary)")
         setStringValue(selectiveSyncHintLabel, viewModel.selectiveSyncHint)
+        setStringValue(selectiveSyncActivityLabel, viewModel.selectiveSyncActivityText)
         conflictPolicyPopup.selectItem(withTitle: viewModel.conflictPolicy.displayName)
         setDoubleValue(heartbeatField, viewModel.heartbeatIntervalSeconds)
         setDoubleValue(debounceField, viewModel.syncDebounceSeconds)
@@ -375,6 +416,11 @@ final class NetworkSyncSettingsViewController: NSViewController {
             peersTextView.string = peerSummary
         }
         setStringValue(statusLabel, viewModel.statusMessage)
+        if viewModel.isSelectiveSyncRefreshing {
+            selectiveSyncActivityIndicator.startAnimation(nil)
+        } else {
+            selectiveSyncActivityIndicator.stopAnimation(nil)
+        }
 
         refreshSelectiveSyncOutlineIfNeeded()
         refreshSelectiveSyncControls()
@@ -418,12 +464,15 @@ final class NetworkSyncSettingsViewController: NSViewController {
 
     private func refreshSelectiveSyncControls() {
         let isClient = viewModel.clientEnabled
-        refreshTreeButton.isEnabled = isClient
-        syncEntireRootCheckBox.isEnabled = isClient
-        selectAllButton.isEnabled = isClient && !viewModel.clientSyncEntireRoot && !viewModel.selectiveSyncNodes.isEmpty
-        clearSelectionButton.isEnabled = isClient && !viewModel.clientSyncEntireRoot
-        expandAllButton.isEnabled = !viewModel.selectiveSyncNodes.isEmpty
-        collapseAllButton.isEnabled = !viewModel.selectiveSyncNodes.isEmpty
+        let isRefreshing = viewModel.isSelectiveSyncRefreshing
+        refreshTreeButton.isEnabled = isClient && !isRefreshing
+        reloadButton.isEnabled = !isRefreshing
+        syncEntireRootCheckBox.isEnabled = isClient && !isRefreshing
+        selectAllButton.isEnabled = isClient && !viewModel.clientSyncEntireRoot && !viewModel.selectiveSyncNodes.isEmpty && !isRefreshing
+        clearSelectionButton.isEnabled = isClient && !viewModel.clientSyncEntireRoot && !isRefreshing
+        expandAllButton.isEnabled = !viewModel.selectiveSyncNodes.isEmpty && !isRefreshing
+        collapseAllButton.isEnabled = !viewModel.selectiveSyncNodes.isEmpty && !isRefreshing
+        selectiveSyncOutlineView.isEnabled = !isRefreshing
         selectiveSyncOutlineView.alphaValue = isClient ? 1 : 0.82
     }
 
@@ -494,5 +543,14 @@ final class NetworkSyncSettingsViewController: NSViewController {
             return
         }
         textField.doubleValue = value
+    }
+
+    private func selectiveSyncActivityRow() -> NSView {
+        let row = NSStackView(views: [selectiveSyncActivityIndicator, selectiveSyncActivityLabel])
+        row.orientation = .horizontal
+        row.spacing = 6
+        row.alignment = .centerY
+        row.translatesAutoresizingMaskIntoConstraints = false
+        return row
     }
 }

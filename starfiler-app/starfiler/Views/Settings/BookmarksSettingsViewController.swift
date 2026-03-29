@@ -217,6 +217,8 @@ final class BookmarksSettingsViewController: NSViewController, NSTableViewDataSo
     }
 
     private func configureLayout() {
+        let outerInset: CGFloat = 24
+
         view.addSubview(descriptionLabel)
         view.addSubview(groupActionsStack)
         view.addSubview(scrollView)
@@ -229,21 +231,21 @@ final class BookmarksSettingsViewController: NSViewController, NSTableViewDataSo
         view.addSubview(openConfigButton)
 
         NSLayoutConstraint.activate([
-            descriptionLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 12),
-            descriptionLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
-            descriptionLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+            descriptionLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: outerInset),
+            descriptionLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: outerInset),
+            descriptionLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -outerInset),
 
             groupActionsStack.topAnchor.constraint(equalTo: descriptionLabel.bottomAnchor, constant: 8),
-            groupActionsStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
-            groupActionsStack.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -12),
+            groupActionsStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: outerInset),
+            groupActionsStack.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -outerInset),
 
             scrollView.topAnchor.constraint(equalTo: groupActionsStack.bottomAnchor, constant: 8),
-            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
-            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: outerInset),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -outerInset),
             scrollView.bottomAnchor.constraint(equalTo: addButton.topAnchor, constant: -8),
 
-            addButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
-            addButton.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -12),
+            addButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: outerInset),
+            addButton.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -outerInset),
 
             editButton.leadingAnchor.constraint(equalTo: addButton.trailingAnchor, constant: 8),
             editButton.centerYAnchor.constraint(equalTo: addButton.centerYAnchor),
@@ -257,7 +259,7 @@ final class BookmarksSettingsViewController: NSViewController, NSTableViewDataSo
             moveDownButton.leadingAnchor.constraint(equalTo: moveUpButton.trailingAnchor, constant: 8),
             moveDownButton.centerYAnchor.constraint(equalTo: addButton.centerYAnchor),
 
-            openConfigButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+            openConfigButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -outerInset),
             openConfigButton.centerYAnchor.constraint(equalTo: addButton.centerYAnchor),
 
             reloadButton.trailingAnchor.constraint(equalTo: openConfigButton.leadingAnchor, constant: -8),

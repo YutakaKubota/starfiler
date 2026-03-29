@@ -272,8 +272,20 @@ final class AppearanceSettingsViewController: NSViewController {
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = true
-        scrollView.documentView = contentView
+        let documentView = NSView()
+        documentView.translatesAutoresizingMaskIntoConstraints = false
+        documentView.addSubview(contentView)
+        scrollView.documentView = documentView
         view.addSubview(scrollView)
+
+        let horizontalInset: CGFloat = 28
+        let verticalInset: CGFloat = 28
+        let maxContentWidth: CGFloat = 860
+        let flexibleWidthConstraint = contentView.widthAnchor.constraint(
+            equalTo: documentView.widthAnchor,
+            constant: -(horizontalInset * 2)
+        )
+        flexibleWidthConstraint.priority = .defaultHigh
 
         var constraints = [
             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
@@ -281,24 +293,34 @@ final class AppearanceSettingsViewController: NSViewController {
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-            contentView.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
-            contentView.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
-            contentView.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
-            contentView.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor),
+            documentView.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
+            documentView.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
+            documentView.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
+            documentView.bottomAnchor.constraint(equalTo: scrollView.contentView.bottomAnchor),
+            documentView.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor),
+            documentView.heightAnchor.constraint(greaterThanOrEqualTo: scrollView.contentView.heightAnchor),
 
-            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
+            contentView.topAnchor.constraint(equalTo: documentView.topAnchor, constant: verticalInset),
+            contentView.leadingAnchor.constraint(greaterThanOrEqualTo: documentView.leadingAnchor, constant: horizontalInset),
+            contentView.trailingAnchor.constraint(lessThanOrEqualTo: documentView.trailingAnchor, constant: -horizontalInset),
+            contentView.centerXAnchor.constraint(equalTo: documentView.centerXAnchor),
+            contentView.bottomAnchor.constraint(lessThanOrEqualTo: documentView.bottomAnchor, constant: -verticalInset),
+            contentView.widthAnchor.constraint(lessThanOrEqualToConstant: maxContentWidth),
+            flexibleWidthConstraint,
+
+            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor),
 
             themePopUpButton.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
             themePopUpButton.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 10),
             themePopUpButton.widthAnchor.constraint(equalToConstant: 220),
 
             descriptionLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
-            descriptionLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            descriptionLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             descriptionLabel.topAnchor.constraint(equalTo: themePopUpButton.bottomAnchor, constant: 10),
 
             swatchContainer.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
-            swatchContainer.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -20),
+            swatchContainer.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor),
             swatchContainer.topAnchor.constraint(equalTo: descriptionLabel.bottomAnchor, constant: 14),
             swatchContainer.heightAnchor.constraint(equalToConstant: 28),
 
@@ -327,7 +349,7 @@ final class AppearanceSettingsViewController: NSViewController {
 
             shootingStarTestButton.leadingAnchor.constraint(greaterThanOrEqualTo: starEffectsButton.trailingAnchor, constant: 12),
             shootingStarTestButton.centerYAnchor.constraint(equalTo: starEffectsButton.centerYAnchor),
-            shootingStarTestButton.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -20),
+            shootingStarTestButton.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor),
         ]
 
         // Effect toggle buttons: indented under the master star effects button
@@ -375,11 +397,11 @@ final class AppearanceSettingsViewController: NSViewController {
             spotlightScopePopUpButton.widthAnchor.constraint(equalToConstant: 220),
 
             spotlightScopeDescriptionLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
-            spotlightScopeDescriptionLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            spotlightScopeDescriptionLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             spotlightScopeDescriptionLabel.topAnchor.constraint(equalTo: spotlightScopePopUpButton.bottomAnchor, constant: 8),
 
             // Bottom anchor to define scrollable content height
-            spotlightScopeDescriptionLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
+            spotlightScopeDescriptionLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
         ])
 
         NSLayoutConstraint.activate(constraints)

@@ -75,39 +75,83 @@ final class AdvancedSettingsViewController: NSViewController {
     }
 
     private func configureLayout() {
-        view.addSubview(titleLabel)
-        view.addSubview(descriptionLabel)
-        view.addSubview(dataFolderTitleLabel)
-        view.addSubview(dataFolderPathLabel)
+        let contentView = NSView()
+        contentView.translatesAutoresizingMaskIntoConstraints = false
+
+        contentView.addSubview(titleLabel)
+        contentView.addSubview(descriptionLabel)
+        contentView.addSubview(dataFolderTitleLabel)
+        contentView.addSubview(dataFolderPathLabel)
 
         let buttonStack = NSStackView(views: [changeButton, resetButton, copyPathButton])
         buttonStack.translatesAutoresizingMaskIntoConstraints = false
         buttonStack.orientation = .horizontal
         buttonStack.spacing = 8
-        view.addSubview(buttonStack)
-        view.addSubview(statusLabel)
+        contentView.addSubview(buttonStack)
+        contentView.addSubview(statusLabel)
+
+        let scrollView = NSScrollView()
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.drawsBackground = false
+        scrollView.hasVerticalScroller = true
+
+        let documentView = NSView()
+        documentView.translatesAutoresizingMaskIntoConstraints = false
+        documentView.addSubview(contentView)
+        scrollView.documentView = documentView
+        view.addSubview(scrollView)
+
+        let horizontalInset: CGFloat = 28
+        let verticalInset: CGFloat = 28
+        let maxContentWidth: CGFloat = 820
+        let flexibleWidthConstraint = contentView.widthAnchor.constraint(
+            equalTo: documentView.widthAnchor,
+            constant: -(horizontalInset * 2)
+        )
+        flexibleWidthConstraint.priority = .defaultHigh
 
         NSLayoutConstraint.activate([
-            titleLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 20),
-            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            documentView.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
+            documentView.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
+            documentView.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
+            documentView.bottomAnchor.constraint(equalTo: scrollView.contentView.bottomAnchor),
+            documentView.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor),
+            documentView.heightAnchor.constraint(greaterThanOrEqualTo: scrollView.contentView.heightAnchor),
+
+            contentView.topAnchor.constraint(equalTo: documentView.topAnchor, constant: verticalInset),
+            contentView.leadingAnchor.constraint(greaterThanOrEqualTo: documentView.leadingAnchor, constant: horizontalInset),
+            contentView.trailingAnchor.constraint(lessThanOrEqualTo: documentView.trailingAnchor, constant: -horizontalInset),
+            contentView.centerXAnchor.constraint(equalTo: documentView.centerXAnchor),
+            contentView.bottomAnchor.constraint(lessThanOrEqualTo: documentView.bottomAnchor, constant: -verticalInset),
+            contentView.widthAnchor.constraint(lessThanOrEqualToConstant: maxContentWidth),
+            flexibleWidthConstraint,
+
+            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor),
+            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
 
             descriptionLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
             descriptionLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
-            descriptionLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            descriptionLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
 
             dataFolderTitleLabel.topAnchor.constraint(equalTo: descriptionLabel.bottomAnchor, constant: 20),
             dataFolderTitleLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
 
             dataFolderPathLabel.topAnchor.constraint(equalTo: dataFolderTitleLabel.bottomAnchor, constant: 8),
             dataFolderPathLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
-            dataFolderPathLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            dataFolderPathLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
 
             buttonStack.topAnchor.constraint(equalTo: dataFolderPathLabel.bottomAnchor, constant: 12),
             buttonStack.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            buttonStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
 
             statusLabel.centerYAnchor.constraint(equalTo: buttonStack.centerYAnchor),
             statusLabel.leadingAnchor.constraint(equalTo: buttonStack.trailingAnchor, constant: 10),
-            statusLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -20),
+            statusLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor),
         ])
     }
 
