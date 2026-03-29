@@ -27,6 +27,10 @@
 		A044C0BCB493112E23403E93 /* ShortcutRegressionUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 230E7EDA0891551B6E0419BC /* ShortcutRegressionUITests.swift */; };
 		A6F98E73AAE0447658073E71 /* SandboxFixtureWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 625BBF22ED7C8DF9F963DCEE /* SandboxFixtureWorkspace.swift */; };
 		A71C439AA3EC244DCEAA171B /* NetworkSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136234B68464371CF5FC3301 /* NetworkSyncService.swift */; };
+		A71C439BA3EC244DCEAA171C /* NetworkSyncService+FinderBadges.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136234B78464371CF5FC3302 /* NetworkSyncService+FinderBadges.swift */; };
+		A71C439CA3EC244DCEAA171D /* NetworkSyncService+Transfers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136234B88464371CF5FC3303 /* NetworkSyncService+Transfers.swift */; };
+		A71C439DA3EC244DCEAA171E /* NetworkSyncService+StatePersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136234B98464371CF5FC3304 /* NetworkSyncService+StatePersistence.swift */; };
+		A71C439EA3EC244DCEAA171F /* NetworkSyncService+Diffing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136234BA8464371CF5FC3305 /* NetworkSyncService+Diffing.swift */; };
 		BA1730EC76F454E2A789144E /* FileOperationServiceIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8744C2A33062020B5AC45A7 /* FileOperationServiceIntegrationTests.swift */; };
 		CC0000000000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000001 /* AppDelegate.swift */; };
 		CC0000000000000000000002 /* MainWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000002 /* MainWindowController.swift */; };
@@ -200,6 +204,10 @@
 		060024D18787057241DAE6D4 /* GlobalActionRouterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GlobalActionRouterTests.swift; sourceTree = "<group>"; };
 		060CBF0D5054826A7CCFB945 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
 		136234B68464371CF5FC3301 /* NetworkSyncService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Sync/NetworkSyncService.swift; sourceTree = "<group>"; };
+		136234B78464371CF5FC3302 /* NetworkSyncService+FinderBadges.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sync/NetworkSyncService+FinderBadges.swift"; sourceTree = "<group>"; };
+		136234B88464371CF5FC3303 /* NetworkSyncService+Transfers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sync/NetworkSyncService+Transfers.swift"; sourceTree = "<group>"; };
+		136234B98464371CF5FC3304 /* NetworkSyncService+StatePersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sync/NetworkSyncService+StatePersistence.swift"; sourceTree = "<group>"; };
+		136234BA8464371CF5FC3305 /* NetworkSyncService+Diffing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sync/NetworkSyncService+Diffing.swift"; sourceTree = "<group>"; };
 		1DA02617092C30A871EDC359 /* BaseUITestCase.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BaseUITestCase.swift; sourceTree = "<group>"; };
 		203ECE8A9D19B20DB7058AB6 /* TaskCenterPopoverViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskCenterPopoverViewController.swift; sourceTree = "<group>"; };
 		230E7EDA0891551B6E0419BC /* ShortcutRegressionUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShortcutRegressionUITests.swift; sourceTree = "<group>"; };
@@ -439,6 +447,10 @@
 				E28F978AA36BA979081BE837 /* NetworkSyncModels.swift */,
 				83C10AF94F9450863E849779 /* NetworkSyncCoordinator.swift */,
 				136234B68464371CF5FC3301 /* NetworkSyncService.swift */,
+				136234B78464371CF5FC3302 /* NetworkSyncService+FinderBadges.swift */,
+				136234B88464371CF5FC3303 /* NetworkSyncService+Transfers.swift */,
+				136234B98464371CF5FC3304 /* NetworkSyncService+StatePersistence.swift */,
+				136234BA8464371CF5FC3305 /* NetworkSyncService+Diffing.swift */,
 			);
 			name = Sync;
 			sourceTree = "<group>";
@@ -1178,6 +1190,10 @@
 				800C98774A959EE8EA064FB5 /* NetworkSyncModels.swift in Sources */,
 				83C10AFA4F9450863E849779 /* NetworkSyncCoordinator.swift in Sources */,
 				A71C439AA3EC244DCEAA171B /* NetworkSyncService.swift in Sources */,
+				A71C439BA3EC244DCEAA171C /* NetworkSyncService+FinderBadges.swift in Sources */,
+				A71C439CA3EC244DCEAA171D /* NetworkSyncService+Transfers.swift in Sources */,
+				A71C439DA3EC244DCEAA171E /* NetworkSyncService+StatePersistence.swift in Sources */,
+				A71C439EA3EC244DCEAA171F /* NetworkSyncService+Diffing.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
