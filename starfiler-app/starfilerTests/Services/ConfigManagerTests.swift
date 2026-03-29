@@ -465,10 +465,10 @@ final class ConfigManagerTests: XCTestCase {
     // MARK: - NetworkSync Finder Badges
 
     func testFinderBadgeAppearanceUsesStandaloneSymbolsForLegibility() {
-        XCTAssertEqual(NetworkSyncService.finderBadgeAppearance(for: .synced).symbolName, "checkmark")
-        XCTAssertEqual(NetworkSyncService.finderBadgeAppearance(for: .syncing).symbolName, "arrow.triangle.2.circlepath")
-        XCTAssertEqual(NetworkSyncService.finderBadgeAppearance(for: .pending).symbolName, "clock")
-        XCTAssertEqual(NetworkSyncService.finderBadgeAppearance(for: .attention).symbolName, "exclamationmark.triangle.fill")
+        XCTAssertEqual(NetworkSyncFinderBadgeManager.appearance(for: .synced).symbolName, "checkmark")
+        XCTAssertEqual(NetworkSyncFinderBadgeManager.appearance(for: .syncing).symbolName, "arrow.triangle.2.circlepath")
+        XCTAssertEqual(NetworkSyncFinderBadgeManager.appearance(for: .pending).symbolName, "clock")
+        XCTAssertEqual(NetworkSyncFinderBadgeManager.appearance(for: .attention).symbolName, "exclamationmark.triangle.fill")
     }
 
     // MARK: - NetworkSync Pending Deletions
