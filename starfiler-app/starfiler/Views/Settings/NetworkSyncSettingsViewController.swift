@@ -40,6 +40,7 @@ final class NetworkSyncSettingsViewController: NSViewController {
     private var suppressViewModelRefresh = false
     private var lastRenderedSelectiveSyncNodes: [SelectiveSyncBrowserNode] = []
     private var hasPerformedInitialSelectiveSyncExpansion = false
+    private var pendingRefreshTask: Task<Void, Never>?
 
     init(viewModel: NetworkSyncViewModel? = nil) {
         self.viewModel = viewModel ?? NetworkSyncViewModel()
@@ -48,6 +49,15 @@ final class NetworkSyncSettingsViewController: NSViewController {
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    deinit {
+        pendingRefreshTask?.cancel()
+        if let selectiveSyncObserverToken {
+            Task { @MainActor [viewModel] in
+                viewModel.removeDidChangeObserver(selectiveSyncObserverToken)
+            }
+        }
     }
 
     override func loadView() {
@@ -341,30 +351,49 @@ final class NetworkSyncSettingsViewController: NSViewController {
             guard let self, !self.suppressViewModelRefresh else {
                 return
             }
-            self.refreshFromViewModel()
+            self.scheduleRefreshFromViewModel()
         }
     }
 
     private func refreshFromViewModel() {
-        descriptionLabel.stringValue = rolesDescription()
-        serverEnabledCheckBox.state = viewModel.serverEnabled ? .on : .off
-        clientEnabledCheckBox.state = viewModel.clientEnabled ? .on : .off
-        displayNameField.stringValue = viewModel.displayName
-        serverRootPathField.stringValue = viewModel.serverRootPath
-        clientRootPathField.stringValue = viewModel.clientRootPath
-        serverRootPathHelpLabel.stringValue = serverRootHelpText()
-        clientRootPathHelpLabel.stringValue = clientRootHelpText()
-        syncEntireRootCheckBox.state = viewModel.clientSyncEntireRoot ? .on : .off
-        selectiveSyncSummaryLabel.stringValue = "Selection: \(viewModel.selectiveSyncSummary)"
-        selectiveSyncHintLabel.stringValue = viewModel.selectiveSyncHint
+        setStringValue(descriptionLabel, rolesDescription())
+        setState(serverEnabledCheckBox, viewModel.serverEnabled ? .on : .off)
+        setState(clientEnabledCheckBox, viewModel.clientEnabled ? .on : .off)
+        setStringValue(displayNameField, viewModel.displayName)
+        setStringValue(serverRootPathField, viewModel.serverRootPath)
+        setStringValue(clientRootPathField, viewModel.clientRootPath)
+        setStringValue(serverRootPathHelpLabel, serverRootHelpText())
+        setStringValue(clientRootPathHelpLabel, clientRootHelpText())
+        setState(syncEntireRootCheckBox, viewModel.clientSyncEntireRoot ? .on : .off)
+        setStringValue(selectiveSyncSummaryLabel, "Selection: \(viewModel.selectiveSyncSummary)")
+        setStringValue(selectiveSyncHintLabel, viewModel.selectiveSyncHint)
         conflictPolicyPopup.selectItem(withTitle: viewModel.conflictPolicy.displayName)
-        heartbeatField.doubleValue = viewModel.heartbeatIntervalSeconds
-        debounceField.doubleValue = viewModel.syncDebounceSeconds
-        peersTextView.string = peerSummaryText()
-        statusLabel.stringValue = viewModel.statusMessage
+        setDoubleValue(heartbeatField, viewModel.heartbeatIntervalSeconds)
+        setDoubleValue(debounceField, viewModel.syncDebounceSeconds)
+        let peerSummary = peerSummaryText()
+        if peersTextView.string != peerSummary {
+            peersTextView.string = peerSummary
+        }
+        setStringValue(statusLabel, viewModel.statusMessage)
 
         refreshSelectiveSyncOutlineIfNeeded()
         refreshSelectiveSyncControls()
+    }
+
+    private func scheduleRefreshFromViewModel() {
+        guard pendingRefreshTask == nil else {
+            return
+        }
+
+        pendingRefreshTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(120))
+            guard let self else { return }
+            self.pendingRefreshTask = nil
+            guard !self.suppressViewModelRefresh else {
+                return
+            }
+            self.refreshFromViewModel()
+        }
     }
 
     private func refreshSelectiveSyncOutlineIfNeeded() {
@@ -537,6 +566,27 @@ final class NetworkSyncSettingsViewController: NSViewController {
         suppressViewModelRefresh = true
         updates()
         suppressViewModelRefresh = false
+    }
+
+    private func setStringValue(_ textField: NSTextField, _ value: String) {
+        guard textField.stringValue != value else {
+            return
+        }
+        textField.stringValue = value
+    }
+
+    private func setState(_ button: NSButton, _ state: NSControl.StateValue) {
+        guard button.state != state else {
+            return
+        }
+        button.state = state
+    }
+
+    private func setDoubleValue(_ textField: NSTextField, _ value: Double) {
+        guard textField.doubleValue != value else {
+            return
+        }
+        textField.doubleValue = value
     }
 
     @objc

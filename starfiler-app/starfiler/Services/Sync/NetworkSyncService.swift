@@ -73,6 +73,8 @@ final class NetworkSyncService: NetworkSyncControlling {
     private var pendingFinderBadgeFlushTask: Task<Void, Never>?
     private var suppressLocalRootEventsUntil = Date.distantPast
     private var suppressedLocalRootRetryTask: Task<Void, Never>?
+    private var pendingLocalRootVerificationTask: Task<Void, Never>?
+    private var remainingLocalRootVerificationPasses = 0
     private var isProcessingLocalRootChange = false
     private var hasPendingLocalRootChange = false
     private var needsStateRefreshAfterLocalChange = false
@@ -167,6 +169,9 @@ final class NetworkSyncService: NetworkSyncControlling {
         lastFinderBadgeStatuses.removeAll()
         suppressedLocalRootRetryTask?.cancel()
         suppressedLocalRootRetryTask = nil
+        pendingLocalRootVerificationTask?.cancel()
+        pendingLocalRootVerificationTask = nil
+        remainingLocalRootVerificationPasses = 0
         suppressLocalRootEventsUntil = .distantPast
         isProcessingLocalRootChange = false
         hasPendingLocalRootChange = false
@@ -330,6 +335,7 @@ final class NetworkSyncService: NetworkSyncControlling {
                 saveClientState()
                 refreshClientFinderBadges()
                 try await pushClientChanges(changes)
+                scheduleLocalRootVerification()
             }
         } catch {
             setError(error.localizedDescription)
@@ -479,6 +485,7 @@ final class NetworkSyncService: NetworkSyncControlling {
                 peerRuntimes[id]?.isConnected = true
                 updateStatus(.idle, detail: "Connected to \(peerRuntimes[id]?.name ?? "server").")
                 sendClientHandshake(over: context.connection)
+                scheduleLocalRootChangeHandling()
             }
         case .failed(let error):
             removeConnection(id: id)
@@ -703,8 +710,6 @@ final class NetworkSyncService: NetworkSyncControlling {
             clearPendingDeletion(at: path)
         }
 
-        localSnapshot = try await scanEntries(at: rootURL!)
-        clientState.materializedPaths = Set(localSnapshot.keys)
         saveClientState()
         refreshClientFinderBadges()
         updateStatus(.idle, detail: "Connected to \(peerRuntimes.values.first?.name ?? "server").")
@@ -1787,7 +1792,6 @@ final class NetworkSyncService: NetworkSyncControlling {
     }
 
     private func scheduleSuppressedLocalRootRetry() {
-        hasPendingLocalRootChange = true
         guard suppressedLocalRootRetryTask == nil else {
             return
         }
@@ -1798,6 +1802,28 @@ final class NetworkSyncService: NetworkSyncControlling {
             guard let self else { return }
             self.suppressedLocalRootRetryTask = nil
             self.scheduleLocalRootChangeHandling()
+        }
+    }
+
+    private func scheduleLocalRootVerification() {
+        remainingLocalRootVerificationPasses = max(remainingLocalRootVerificationPasses, 3)
+        guard pendingLocalRootVerificationTask == nil else {
+            return
+        }
+
+        let delay = max(0.2, config.syncDebounceSeconds)
+        pendingLocalRootVerificationTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard let self else { return }
+            self.pendingLocalRootVerificationTask = nil
+            guard self.remainingLocalRootVerificationPasses > 0 else {
+                return
+            }
+            self.remainingLocalRootVerificationPasses -= 1
+            self.scheduleLocalRootChangeHandling()
+            if self.remainingLocalRootVerificationPasses > 0 {
+                self.scheduleLocalRootVerification()
+            }
         }
     }
 
@@ -2139,6 +2165,7 @@ private final class NetworkSyncPathMonitor {
     private let queue = DispatchQueue(label: "com.nilone.starfiler.network-sync.fsevents")
     private var stream: FSEventStreamRef?
     private var pendingWorkItem: DispatchWorkItem?
+    private var needsFollowUpCallback = false
 
     init(url: URL, debounceInterval: TimeInterval, callback: @escaping () -> Void) {
         self.url = url
@@ -2197,6 +2224,7 @@ private final class NetworkSyncPathMonitor {
     func stop() {
         pendingWorkItem?.cancel()
         pendingWorkItem = nil
+        needsFollowUpCallback = false
 
         guard let stream else {
             return
@@ -2210,12 +2238,20 @@ private final class NetworkSyncPathMonitor {
 
     private func scheduleCallback() {
         guard pendingWorkItem == nil else {
+            needsFollowUpCallback = true
             return
         }
 
         let workItem = DispatchWorkItem { [weak self] in
-            self?.pendingWorkItem = nil
-            self?.callback()
+            guard let self else {
+                return
+            }
+            self.pendingWorkItem = nil
+            self.callback()
+            if self.needsFollowUpCallback {
+                self.needsFollowUpCallback = false
+                self.scheduleCallback()
+            }
         }
         pendingWorkItem = workItem
         queue.asyncAfter(deadline: .now() + debounceInterval, execute: workItem)

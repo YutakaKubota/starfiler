@@ -31,14 +31,6 @@ private actor SelectiveSyncBrowserDataLoader {
     }
 }
 
-private struct SelectiveSyncSnapshotFingerprint: Equatable {
-    let browserStateVersion: Int
-    let conflictIDs: [String]
-    let transferIDs: [String]
-
-    static let empty = SelectiveSyncSnapshotFingerprint(browserStateVersion: 0, conflictIDs: [], transferIDs: [])
-}
-
 enum SelectiveSyncSelectionState: Sendable {
     case off
     case on
@@ -109,7 +101,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
     private var cachedLocalAvailability: Set<String> = []
     private var selectiveSyncRefreshTask: Task<Void, Never>?
     private var selectiveSyncRefreshGeneration = 0
-    private var lastSelectiveSyncRefreshFingerprint = SelectiveSyncSnapshotFingerprint.empty
+    private var lastSelectiveSyncBrowserStateVersion = 0
 
     var isEnabled: Bool {
         serverEnabled || clientEnabled
@@ -389,7 +381,7 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
             )
         }
         let shouldReloadFromDisk = selectiveSyncCacheNeedsDiskRefresh(for: snapshot)
-        refreshSelectiveSyncBrowser(needsDiskRefresh: shouldReloadFromDisk, notifyOnChange: false)
+        refreshSelectiveSyncBrowser(needsDiskRefresh: shouldReloadFromDisk, notifyOnChange: shouldReloadFromDisk)
         notifyDidChange()
     }
 
@@ -813,13 +805,8 @@ final class NetworkSyncViewModel: SyncStatusBarPresenting {
     }
 
     private func selectiveSyncCacheNeedsDiskRefresh(for snapshot: NetworkSyncRuntimeSnapshot) -> Bool {
-        let nextFingerprint = SelectiveSyncSnapshotFingerprint(
-            browserStateVersion: snapshot.browserStateVersion,
-            conflictIDs: snapshot.conflicts.map(\.id),
-            transferIDs: snapshot.transfers.map(\.id)
-        )
-        defer { lastSelectiveSyncRefreshFingerprint = nextFingerprint }
-        return nextFingerprint != lastSelectiveSyncRefreshFingerprint
+        defer { lastSelectiveSyncBrowserStateVersion = snapshot.browserStateVersion }
+        return snapshot.browserStateVersion != lastSelectiveSyncBrowserStateVersion
     }
 
     private func logSelectiveSyncRefresh(label: String, startedAt: CFAbsoluteTime) {

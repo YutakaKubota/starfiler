@@ -405,6 +405,121 @@ final class SyncViewModelTests: XCTestCase {
         XCTAssertEqual(service.requestRefreshCallCount, 1)
     }
 
+    func testNetworkSyncViewModelReusesSelectiveSyncCacheWhenOnlyTransferHistoryChanges() async throws {
+        let rootURL = tempConfigDir.appendingPathComponent("NetworkSyncTransferCacheRoot", isDirectory: true)
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+
+        let entries = [
+            makeNetworkSyncEntry(relativePath: "docs", isDirectory: true),
+            makeNetworkSyncEntry(relativePath: "docs/file.txt", isDirectory: false, size: 4),
+        ]
+        let config = NetworkSyncConfig(
+            clientEnabled: true,
+            clientRootPath: rootURL.path,
+            clientSyncEntireRoot: false,
+            clientIncludedPaths: ["docs"]
+        )
+        try configManager.saveNetworkSyncConfig(config)
+        try writeNetworkSyncState(
+            rootPath: config.clientEffectiveRootPath,
+            entries: entries,
+            materializedPaths: ["docs", "docs/file.txt"]
+        )
+        try createLocalPaths(rootURL: rootURL, paths: ["docs/file.txt"])
+
+        let service = MockNetworkSyncController()
+        let sut = NetworkSyncViewModel(configManager: configManager, service: service)
+        await waitForCondition(description: "Selective sync nodes loaded") {
+            !sut.selectiveSyncNodes.isEmpty
+        }
+
+        let initialNodes = sut.selectiveSyncNodes
+        let stateURL = configManager
+            .networkSyncRuntimeDirectory(rootPath: config.clientEffectiveRootPath)
+            .appendingPathComponent("client-state.json")
+        try FileManager.default.removeItem(at: stateURL)
+
+        service.emit(
+            NetworkSyncRuntimeSnapshot(
+                status: .idle,
+                detail: "Idle",
+                peers: [],
+                conflicts: [],
+                transfers: [
+                    NetworkSyncTransferRecord(
+                        id: UUID().uuidString,
+                        relativePath: "docs/file.txt",
+                        direction: .download,
+                        status: "Completed",
+                        progress: 1,
+                        detail: "Downloaded from server",
+                        timestamp: Date()
+                    )
+                ],
+                activeTransfers: [:],
+                browserStateVersion: 0
+            )
+        )
+        try? await Task.sleep(for: .milliseconds(150))
+
+        XCTAssertEqual(sut.selectiveSyncNodes, initialNodes)
+    }
+
+    func testNetworkSyncViewModelNotifiesObserversAfterAsyncSelectiveSyncRefresh() async throws {
+        let rootURL = tempConfigDir.appendingPathComponent("NetworkSyncObserverRoot", isDirectory: true)
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+
+        let entries = [
+            makeNetworkSyncEntry(relativePath: "selected.txt", isDirectory: false, size: 4),
+        ]
+        let config = NetworkSyncConfig(
+            clientEnabled: true,
+            clientRootPath: rootURL.path,
+            clientSyncEntireRoot: false,
+            clientIncludedPaths: ["selected.txt"]
+        )
+        try configManager.saveNetworkSyncConfig(config)
+        try writeNetworkSyncState(
+            rootPath: config.clientEffectiveRootPath,
+            entries: entries,
+            materializedPaths: []
+        )
+
+        let service = MockNetworkSyncController()
+        let sut = NetworkSyncViewModel(configManager: configManager, service: service)
+        await waitForCondition(description: "Selected node starts pending download") {
+            sut.selectiveSyncNodes.first?.runtimeState == .selectedPendingDownload
+        }
+
+        var observerCallCount = 0
+        let observerToken = sut.addDidChangeObserver {
+            observerCallCount += 1
+        }
+        defer { sut.removeDidChangeObserver(observerToken) }
+
+        try writeNetworkSyncState(
+            rootPath: config.clientEffectiveRootPath,
+            entries: entries,
+            materializedPaths: ["selected.txt"]
+        )
+
+        service.emit(
+            NetworkSyncRuntimeSnapshot(
+                status: .idle,
+                detail: "Idle",
+                peers: [],
+                conflicts: [],
+                transfers: [],
+                activeTransfers: [:],
+                browserStateVersion: 1
+            )
+        )
+
+        await waitForCondition(description: "Observer notified after async selective sync refresh") {
+            observerCallCount >= 2 && sut.selectiveSyncNodes.first?.runtimeState == .synced
+        }
+    }
+
     func testNetworkSyncSettingsViewControllerPreservesCollapsedOutlineStateAcrossUpdates() async throws {
         let rootURL = tempConfigDir.appendingPathComponent("NetworkSyncOutlineRoot", isDirectory: true)
         try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
