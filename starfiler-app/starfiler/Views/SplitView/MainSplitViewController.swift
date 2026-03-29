@@ -190,8 +190,8 @@ private final class PreviewPopupPanelController {
 
 final class MainSplitViewController: NSSplitViewController, NSPopoverDelegate {
     private static let defaultSidebarWidth = CGFloat(AppConfig.defaultSidebarWidth)
-    private static let sidebarWidthRange: ClosedRange<CGFloat> = CGFloat(AppConfig.sidebarWidthRange.lowerBound) ... CGFloat(AppConfig.sidebarWidthRange.upperBound)
-    private static var lastSelectedBookmarkGroupIndex: Int = 0
+    static let sidebarWidthRange: ClosedRange<CGFloat> = CGFloat(AppConfig.sidebarWidthRange.lowerBound) ... CGFloat(AppConfig.sidebarWidthRange.upperBound)
+    static var lastSelectedBookmarkGroupIndex: Int = 0
 
     private struct PaneStatus {
         var path: String
@@ -199,28 +199,28 @@ final class MainSplitViewController: NSSplitViewController, NSPopoverDelegate {
         var markedCount: Int
     }
 
-    private struct SidebarBookmarkEditResult {
+    struct SidebarBookmarkEditResult {
         let groupName: String
         let displayName: String
         let path: String
         let shortcutKey: String?
     }
 
-    private let viewModel: MainViewModel
-    private let configManager: ConfigManager
-    private let sidebarViewModel: SidebarViewModel
-    private let sidebarViewController: SidebarViewController
-    private let sidebarSplitItem: NSSplitViewItem
-    private let leftPaneViewController: FilePaneViewController
-    private let rightPaneViewController: FilePaneViewController
-    private let leftSplitItem: NSSplitViewItem
-    private let rightSplitItem: NSSplitViewItem
+    let viewModel: MainViewModel
+    let configManager: ConfigManager
+    let sidebarViewModel: SidebarViewModel
+    let sidebarViewController: SidebarViewController
+    let sidebarSplitItem: NSSplitViewItem
+    let leftPaneViewController: FilePaneViewController
+    let rightPaneViewController: FilePaneViewController
+    let leftSplitItem: NSSplitViewItem
+    let rightSplitItem: NSSplitViewItem
     private let previewPopupPaneViewController: PreviewPaneViewController
 
-    private var bookmarksConfig: BookmarksConfig
-    private var bookmarkSearchPanelController: BookmarkSearchPanelController?
-    private var markdownPreviewPanelControllers: [URL: MarkdownPreviewPanelController] = [:]
-    private var batchRenameWindowController: NSWindowController?
+    var bookmarksConfig: BookmarksConfig
+    var bookmarkSearchPanelController: BookmarkSearchPanelController?
+    var markdownPreviewPanelControllers: [URL: MarkdownPreviewPanelController] = [:]
+    var batchRenameWindowController: NSWindowController?
 
 
     private var leftPaneStatus: PaneStatus
@@ -231,18 +231,18 @@ final class MainSplitViewController: NSSplitViewController, NSPopoverDelegate {
     private var leftPaneFileIconSize: CGFloat
     private var rightPaneFileIconSize: CGFloat
     private var starEffectsEnabled = true
-    private var currentFilerTheme: FilerTheme = .system
+    var currentFilerTheme: FilerTheme = .system
     private var animationEffectSettings = AnimationEffectSettings.allEnabled
-    private let initialSidebarWidth: CGFloat
-    private var hasAppliedInitialSidebarWidth = false
-    private var lastReportedSidebarWidth: CGFloat
-    private var isAdjustingSplitLayout = false
+    let initialSidebarWidth: CGFloat
+    var hasAppliedInitialSidebarWidth = false
+    var lastReportedSidebarWidth: CGFloat
+    var isAdjustingSplitLayout = false
     private let toastPresenter = ActionToastPresenter()
     private let globalActionRouter = GlobalActionRouter()
     private let applicationRelatedItemLocator: any ApplicationRelatedItemLocating = ApplicationRelatedItemLocatorService()
-    private var goToPathPopover: NSPopover?
-    private weak var goToPathHighlightView: NSView?
-    private var shouldRefocusAfterGoToPathDismiss = true
+    var goToPathPopover: NSPopover?
+    weak var goToPathHighlightView: NSView?
+    var shouldRefocusAfterGoToPathDismiss = true
     private lazy var previewPopupPanelController: PreviewPopupPanelController = {
         let controller = PreviewPopupPanelController(previewViewController: previewPopupPaneViewController)
         controller.onDismiss = { [weak self] in
@@ -451,7 +451,7 @@ final class MainSplitViewController: NSSplitViewController, NSPopoverDelegate {
         splitView.setPosition(targetDividerPosition, ofDividerAt: leftIndex)
     }
 
-    private func arrangedSubviewIndex(for paneView: NSView, in arrangedSubviews: [NSView]) -> Int? {
+    func arrangedSubviewIndex(for paneView: NSView, in arrangedSubviews: [NSView]) -> Int? {
         arrangedSubviews.firstIndex { arrangedSubview in
             paneView === arrangedSubview || paneView.isDescendant(of: arrangedSubview)
         }
@@ -502,113 +502,8 @@ final class MainSplitViewController: NSSplitViewController, NSPopoverDelegate {
         presentApplicationDeletionDialog(selectedURLs: selectedURLs, appBundleURLs: appBundleURLs)
     }
 
-    func presentGoToPathPrompt() {
-        let activePaneSide = viewModel.activePaneSide
-        let currentPath = viewModel.activePane.paneState.currentDirectory.path
-        let paneView = paneViewController(for: activePaneSide).view
-        let accentColor = goToPathAccentColor(for: activePaneSide)
-
-        dismissGoToPathPopover(refocusActivePane: false)
-
-        var popoverContentController: GoToPathPopoverViewController?
-        let contentController = GoToPathPopoverViewController(
-            currentPath: currentPath,
-            accentColor: accentColor,
-            onSubmit: { [weak self] rawInput in
-                guard let self else {
-                    return
-                }
-
-                let trimmedInput = rawInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmedInput.isEmpty else {
-                    popoverContentController?.showValidationError("Enter a path")
-                    return
-                }
-
-                guard let destination = self.resolveNavigationDestination(from: trimmedInput) else {
-                    popoverContentController?.showValidationError("Path not found")
-                    return
-                }
-
-                self.dismissGoToPathPopover(refocusActivePane: true)
-                self.navigateActivePane(to: destination)
-            },
-            onCancel: { [weak self] in
-                self?.dismissGoToPathPopover(refocusActivePane: true)
-            }
-        )
-        popoverContentController = contentController
-
-        let popover = NSPopover()
-        popover.behavior = .semitransient
-        popover.animates = true
-        popover.delegate = self
-        popover.contentViewController = contentController
-
-        showGoToPathHighlight(on: paneView, accentColor: accentColor)
-
-        let anchorRect = NSRect(x: paneView.bounds.midX - 1, y: paneView.bounds.height - 28, width: 2, height: 2)
-        popover.show(relativeTo: anchorRect, of: paneView, preferredEdge: .minY)
-        contentController.focusInputField()
-        goToPathPopover = popover
-    }
-
     func popoverDidClose(_ notification: Notification) {
-        clearGoToPathPresentation(refocusActivePane: shouldRefocusAfterGoToPathDismiss)
-        shouldRefocusAfterGoToPathDismiss = true
-    }
-
-    private func dismissGoToPathPopover(refocusActivePane: Bool) {
-        shouldRefocusAfterGoToPathDismiss = refocusActivePane
-
-        guard let popover = goToPathPopover else {
-            clearGoToPathPresentation(refocusActivePane: refocusActivePane)
-            return
-        }
-
-        popover.performClose(nil)
-    }
-
-    private func clearGoToPathPresentation(refocusActivePane: Bool) {
-        goToPathPopover?.delegate = nil
-        goToPathPopover = nil
-        goToPathHighlightView?.removeFromSuperview()
-        goToPathHighlightView = nil
-
-        if refocusActivePane {
-            focusActivePane()
-        }
-    }
-
-    private func goToPathAccentColor(for side: PaneSide) -> NSColor {
-        switch side {
-        case .left:
-            return .systemBlue
-        case .right:
-            return .systemOrange
-        }
-    }
-
-    private func showGoToPathHighlight(on paneView: NSView, accentColor: NSColor) {
-        goToPathHighlightView?.removeFromSuperview()
-
-        let overlay = PaneHighlightOverlayView()
-        overlay.translatesAutoresizingMaskIntoConstraints = false
-        overlay.wantsLayer = true
-        overlay.layer?.borderWidth = 3
-        overlay.layer?.cornerRadius = 8
-        overlay.layer?.borderColor = accentColor.withAlphaComponent(0.85).cgColor
-        overlay.layer?.backgroundColor = accentColor.withAlphaComponent(0.08).cgColor
-
-        paneView.addSubview(overlay)
-        NSLayoutConstraint.activate([
-            overlay.leadingAnchor.constraint(equalTo: paneView.leadingAnchor),
-            overlay.trailingAnchor.constraint(equalTo: paneView.trailingAnchor),
-            overlay.topAnchor.constraint(equalTo: paneView.topAnchor),
-            overlay.bottomAnchor.constraint(equalTo: paneView.bottomAnchor)
-        ])
-
-        goToPathHighlightView = overlay
+        handlePopoverDidClose(refocusActivePane: shouldRefocusAfterGoToPathDismiss)
     }
 
     func embedWindowControlButtons(_ buttons: [NSButton]) {
@@ -808,7 +703,7 @@ final class MainSplitViewController: NSSplitViewController, NSPopoverDelegate {
         return true
     }
 
-    private func setActivePane(_ side: PaneSide) {
+    func setActivePane(_ side: PaneSide) {
         guard viewModel.activePaneSide != side else {
             return
         }
@@ -1123,7 +1018,7 @@ final class MainSplitViewController: NSSplitViewController, NSPopoverDelegate {
         }
     }
 
-    private func showActionToast(_ message: String) {
+    func showActionToast(_ message: String) {
         guard actionFeedbackEnabled else {
             return
         }
@@ -1142,27 +1037,6 @@ final class MainSplitViewController: NSSplitViewController, NSPopoverDelegate {
         publishActivePaneStatus()
         publishActivePaneStatusContext()
         updateSidebarNavigationHistory()
-    }
-
-    private func applySidebarVisibility(animated: Bool) {
-        let shouldCollapse = !viewModel.sidebarVisible
-        guard sidebarSplitItem.isCollapsed != shouldCollapse else {
-            return
-        }
-
-        if animated {
-            NSAnimationContext.runAnimationGroup({ context in
-                context.duration = 0.18
-                sidebarSplitItem.animator().isCollapsed = shouldCollapse
-            }, completionHandler: { [weak self] in
-                self?.restoreSidebarWidthIfNeeded()
-                self?.reportSidebarWidthIfNeeded(force: true)
-            })
-        } else {
-            sidebarSplitItem.isCollapsed = shouldCollapse
-            restoreSidebarWidthIfNeeded()
-            reportSidebarWidthIfNeeded(force: true)
-        }
     }
 
     private func applyPreviewPaneVisibility(animated: Bool) {
@@ -1305,175 +1179,13 @@ final class MainSplitViewController: NSSplitViewController, NSPopoverDelegate {
         onStatusContextTextChanged?(statusContextText)
     }
 
-    private func applyPaneVisibility(leftVisible: Bool, rightVisible: Bool, animated: Bool) {
-        let normalizedLeftVisible: Bool
-        let normalizedRightVisible: Bool
-        if !leftVisible, !rightVisible {
-            normalizedLeftVisible = true
-            normalizedRightVisible = false
-        } else {
-            normalizedLeftVisible = leftVisible
-            normalizedRightVisible = rightVisible
-        }
-
-        setPaneVisibility(splitItem: leftSplitItem, visible: normalizedLeftVisible, animated: animated)
-        setPaneVisibility(splitItem: rightSplitItem, visible: normalizedRightVisible, animated: animated)
-
-        if !normalizedLeftVisible, viewModel.activePaneSide == .left {
-            setActivePane(.right)
-        } else if !normalizedRightVisible, viewModel.activePaneSide == .right {
-            setActivePane(.left)
-        }
-
-        onPaneVisibilityChanged?(normalizedLeftVisible, normalizedRightVisible)
-    }
-
-    private func togglePaneVisibility(side: PaneSide, animated: Bool) {
-        let leftVisible = !leftSplitItem.isCollapsed
-        let rightVisible = !rightSplitItem.isCollapsed
-        switch side {
-        case .left:
-            if leftVisible, !rightVisible {
-                return
-            }
-            applyPaneVisibility(leftVisible: !leftVisible, rightVisible: rightVisible, animated: animated)
-        case .right:
-            if rightVisible, !leftVisible {
-                return
-            }
-            applyPaneVisibility(leftVisible: leftVisible, rightVisible: !rightVisible, animated: animated)
-        }
-    }
-
-    private func setPaneVisibility(splitItem: NSSplitViewItem, visible: Bool, animated: Bool) {
-        let shouldCollapse = !visible
-        guard splitItem.isCollapsed != shouldCollapse else {
-            return
-        }
-
-        if animated {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.18
-                splitItem.animator().isCollapsed = shouldCollapse
-            }
-        } else {
-            splitItem.isCollapsed = shouldCollapse
-        }
-    }
-
-    private func paneViewController(for side: PaneSide) -> FilePaneViewController {
+    func paneViewController(for side: PaneSide) -> FilePaneViewController {
         switch side {
         case .left:
             return leftPaneViewController
         case .right:
             return rightPaneViewController
         }
-    }
-
-    private func applyInitialSidebarWidthIfNeeded() {
-        guard !hasAppliedInitialSidebarWidth else {
-            return
-        }
-
-        hasAppliedInitialSidebarWidth = true
-        if !sidebarSplitItem.isCollapsed, splitView.arrangedSubviews.count > 1 {
-            splitView.setPosition(initialSidebarWidth, ofDividerAt: 0)
-        }
-
-        reportSidebarWidthIfNeeded(force: true)
-    }
-
-    private func adjustSplitLayoutIfNeeded() {
-        guard !isAdjustingSplitLayout else {
-            return
-        }
-
-        let arrangedSubviews = splitView.arrangedSubviews
-        guard !arrangedSubviews.isEmpty else {
-            return
-        }
-
-        isAdjustingSplitLayout = true
-        defer { isAdjustingSplitLayout = false }
-
-        if !sidebarSplitItem.isCollapsed,
-           let sidebarIndex = arrangedSubviewIndex(for: sidebarViewController.view, in: arrangedSubviews),
-           sidebarIndex < arrangedSubviews.count - 1 {
-            let currentSidebarWidth = arrangedSubviews[sidebarIndex].frame.width
-            let maximumSidebarWidth = maximumAllowedSidebarWidth(for: arrangedSubviews)
-            let clampedSidebarWidth = min(currentSidebarWidth, maximumSidebarWidth)
-            if abs(clampedSidebarWidth - currentSidebarWidth) >= 1 {
-                splitView.setPosition(clampedSidebarWidth, ofDividerAt: sidebarIndex)
-            }
-        }
-
-        guard !leftSplitItem.isCollapsed,
-              !rightSplitItem.isCollapsed else {
-            return
-        }
-
-        let updatedSubviews = splitView.arrangedSubviews
-        guard let leftIndex = arrangedSubviewIndex(for: leftPaneViewController.view, in: updatedSubviews),
-              let rightIndex = arrangedSubviewIndex(for: rightPaneViewController.view, in: updatedSubviews),
-              rightIndex == leftIndex + 1 else {
-            return
-        }
-
-        let leftMinX = updatedSubviews[leftIndex].frame.minX
-        let rightMaxX = updatedSubviews[rightIndex].frame.maxX
-        let currentDividerPosition = updatedSubviews[leftIndex].frame.maxX
-        let minimumDividerPosition = leftMinX + leftSplitItem.minimumThickness
-        let maximumDividerPosition = rightMaxX - splitView.dividerThickness - rightSplitItem.minimumThickness
-
-        guard maximumDividerPosition >= minimumDividerPosition else {
-            return
-        }
-
-        let clampedDividerPosition = min(max(currentDividerPosition, minimumDividerPosition), maximumDividerPosition)
-        if abs(clampedDividerPosition - currentDividerPosition) >= 1 {
-            splitView.setPosition(clampedDividerPosition, ofDividerAt: leftIndex)
-        }
-    }
-
-    private func restoreSidebarWidthIfNeeded() {
-        guard !sidebarSplitItem.isCollapsed, splitView.arrangedSubviews.count > 1 else {
-            return
-        }
-
-        splitView.setPosition(lastReportedSidebarWidth, ofDividerAt: 0)
-    }
-
-    private func reportSidebarWidthIfNeeded(force: Bool) {
-        guard !sidebarSplitItem.isCollapsed else {
-            return
-        }
-
-        let width = Self.clampedSidebarWidth(sidebarViewController.view.frame.width)
-        guard force || abs(width - lastReportedSidebarWidth) >= 1 else {
-            return
-        }
-
-        lastReportedSidebarWidth = width
-        onSidebarWidthChanged?(width)
-    }
-
-    private static func clampedSidebarWidth(_ width: CGFloat) -> CGFloat {
-        min(max(width, sidebarWidthRange.lowerBound), sidebarWidthRange.upperBound)
-    }
-
-    private func maximumAllowedSidebarWidth(for arrangedSubviews: [NSView]) -> CGFloat {
-        let dividerCount = max(arrangedSubviews.count - 1, 0)
-        let visiblePaneMinimumWidths =
-            (!leftSplitItem.isCollapsed ? leftSplitItem.minimumThickness : 0) +
-            (!rightSplitItem.isCollapsed ? rightSplitItem.minimumThickness : 0)
-        let availableSidebarWidth = splitView.bounds.width
-            - (CGFloat(dividerCount) * splitView.dividerThickness)
-            - visiblePaneMinimumWidths
-
-        return min(
-            Self.sidebarWidthRange.upperBound,
-            max(Self.sidebarWidthRange.lowerBound, availableSidebarWidth)
-        )
     }
 
     private func presentTextPrompt(_ prompt: TextInputPrompt) -> String? {
@@ -1519,729 +1231,4 @@ final class MainSplitViewController: NSSplitViewController, NSPopoverDelegate {
         )
     }
 
-    private func propagateBookmarksConfig() {
-        leftPaneViewController.updateBookmarksConfig(bookmarksConfig)
-        rightPaneViewController.updateBookmarksConfig(bookmarksConfig)
-    }
-
-    private func presentBookmarkSearchPanel() {
-        bookmarkSearchPanelController?.dismiss()
-
-        let searchVM = BookmarkSearchViewModel()
-        searchVM.load(
-            from: bookmarksConfig,
-            history: viewModel.visitHistoryService.recentEntries(limit: 20)
-        )
-
-        let panel = BookmarkSearchPanelController(viewModel: searchVM)
-        panel.onSelectEntry = { [weak self] result in
-            self?.navigateToSearchResult(result)
-        }
-        panel.onDismiss = { [weak self] in
-            self?.bookmarkSearchPanelController = nil
-            self?.focusActivePane()
-        }
-
-        guard let window = view.window else {
-            return
-        }
-
-        panel.showRelativeTo(window: window)
-        bookmarkSearchPanelController = panel
-    }
-
-    private func navigateToSearchResult(_ result: BookmarkSearchViewModel.SearchResult) {
-        let path = PathNormalizer.resolveExistingPath(UserPaths.resolveBookmarkPath(result.path))
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) else {
-            presentPathNotFoundAlert(path: path)
-            return
-        }
-
-        let url = URL(fileURLWithPath: path).standardizedFileURL
-        let destination = isDirectory.boolValue
-            ? url
-            : url.deletingLastPathComponent().standardizedFileURL
-
-        if viewModel.activePane.displayMode == .media {
-            viewModel.activePane.setDisplayMode(.browser)
-        }
-
-        navigateActivePane(to: destination)
-    }
-
-    private func resolveNavigationDestination(from rawInput: String) -> URL? {
-        let sanitizedInput = stripSurroundingQuotes(from: rawInput.trimmingCharacters(in: .whitespacesAndNewlines))
-        guard !sanitizedInput.isEmpty else {
-            return nil
-        }
-
-        let homeAliasNormalizedInput = normalizedHomeAliasPath(from: sanitizedInput)
-        let expandedPath = (homeAliasNormalizedInput as NSString).expandingTildeInPath
-        let currentDirectory = viewModel.activePane.paneState.currentDirectory
-        let rawURL: URL
-        if expandedPath.hasPrefix("/") {
-            rawURL = URL(fileURLWithPath: expandedPath)
-        } else {
-            rawURL = URL(fileURLWithPath: expandedPath, relativeTo: currentDirectory)
-        }
-
-        let normalizedURL = rawURL.standardizedFileURL
-        let resolvedPath = PathNormalizer.resolveExistingPath(normalizedURL.path)
-        let resolvedURL = URL(fileURLWithPath: resolvedPath, isDirectory: true).standardizedFileURL
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: resolvedURL.path, isDirectory: &isDirectory) else {
-            return nil
-        }
-
-        if isDirectory.boolValue {
-            return resolvedURL
-        }
-
-        return resolvedURL.deletingLastPathComponent().standardizedFileURL
-    }
-
-    private func normalizedHomeAliasPath(from path: String) -> String {
-        let lowercasedPath = path.lowercased()
-        if lowercasedPath == "home" {
-            return "~"
-        }
-
-        let prefix = "home/"
-        guard lowercasedPath.hasPrefix(prefix) else {
-            return path
-        }
-
-        let suffixStart = path.index(path.startIndex, offsetBy: prefix.count)
-        return "~/" + String(path[suffixStart...])
-    }
-
-    private func stripSurroundingQuotes(from value: String) -> String {
-        guard value.count >= 2 else {
-            return value
-        }
-
-        if (value.hasPrefix("\"") && value.hasSuffix("\"")) || (value.hasPrefix("'") && value.hasSuffix("'")) {
-            return String(value.dropFirst().dropLast())
-        }
-
-        return value
-    }
-
-    private func navigateActivePane(to destination: URL, selecting itemURL: URL? = nil) {
-        let normalizedDestination = destination.standardizedFileURL
-        Task { [weak self] in
-            guard let self else {
-                return
-            }
-
-            do {
-                try await self.viewModel.securityScopedBookmarkService.startAccessing(normalizedDestination)
-                await self.viewModel.securityScopedBookmarkService.stopAccessing(normalizedDestination)
-                await MainActor.run {
-                    if let itemURL {
-                        self.viewModel.activePane.navigate(to: normalizedDestination, selecting: itemURL)
-                        self.focusActivePane()
-                    } else {
-                        self.viewModel.activePane.navigate(to: normalizedDestination)
-                    }
-                }
-            } catch let bookmarkError as SecurityScopedBookmarkError {
-                switch bookmarkError {
-                case .bookmarkNotFound:
-                    await MainActor.run {
-                        self.presentAccessGrantPrompt(for: normalizedDestination)
-                    }
-                default:
-                    await MainActor.run {
-                        self.presentNavigationErrorAlert(for: normalizedDestination, error: bookmarkError)
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    self.presentNavigationErrorAlert(for: normalizedDestination, error: error)
-                }
-            }
-        }
-    }
-
-    private func presentPathNotFoundAlert(path: String) {
-        presentErrorAlert(title: "Path not found", informativeText: path)
-    }
-
-    private func presentAccessGrantPrompt(for destination: URL) {
-        let panel = NSOpenPanel()
-        panel.title = "Grant Folder Access"
-        panel.message = "Select the bookmark folder (or one of its parent folders) to allow navigation."
-        panel.prompt = "Grant Access"
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.canCreateDirectories = false
-        panel.directoryURL = destination
-
-        guard panel.runModal() == .OK, let selectedURL = panel.url?.standardizedFileURL else {
-            return
-        }
-
-        guard isSameOrDescendant(destination, of: selectedURL) else {
-            let alert = NSAlert()
-            alert.alertStyle = .warning
-            alert.messageText = "Selected folder does not contain bookmark"
-            alert.informativeText = "Choose \(destination.path) or one of its parent folders."
-            alert.addButton(withTitle: "OK")
-            alert.runModal()
-            return
-        }
-
-        Task { [weak self] in
-            guard let self else {
-                return
-            }
-
-            do {
-                try await self.viewModel.securityScopedBookmarkService.saveBookmark(for: selectedURL)
-                await MainActor.run {
-                    self.viewModel.activePane.navigate(to: destination)
-                }
-            } catch {
-                await MainActor.run {
-                    self.presentNavigationErrorAlert(for: selectedURL, error: error)
-                }
-            }
-        }
-    }
-
-    private func presentNavigationErrorAlert(for destination: URL, error: Error) {
-        presentErrorAlert(
-            title: "Failed to open path",
-            informativeText: "\(destination.path)\n\n\(error.localizedDescription)"
-        )
-    }
-
-    private func presentBookmarkPermissionSaveError(for destination: URL, error: Error) {
-        presentErrorAlert(
-            title: "Bookmark saved without access permission",
-            informativeText:
-                "\(destination.path)\n\n" +
-                "You can keep this bookmark, but navigation may fail until access is granted.\n\n" +
-                error.localizedDescription
-        )
-    }
-
-    private func presentErrorAlert(title: String, informativeText: String) {
-        let alert = NSAlert()
-        alert.alertStyle = .warning
-        alert.messageText = title
-        alert.informativeText = informativeText
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
-    }
-
-    private func isSameOrDescendant(_ child: URL, of parent: URL) -> Bool {
-        let childPath = child.standardizedFileURL.resolvingSymlinksInPath().path
-        let parentPath = parent.standardizedFileURL.resolvingSymlinksInPath().path
-        return PathNormalizer.isSameOrDescendant(childPath, of: parentPath)
-    }
-
-    private func presentAddBookmarkAlert() {
-        let targetURL: URL
-        if let selectedItem = viewModel.activePane.selectedItem, selectedItem.isDirectory {
-            targetURL = selectedItem.url.standardizedFileURL
-        } else {
-            targetURL = viewModel.activePane.paneState.currentDirectory.standardizedFileURL
-        }
-        let defaultDisplayName = targetURL.lastPathComponent.isEmpty
-            ? targetURL.path
-            : targetURL.lastPathComponent
-
-        let alert = NSAlert()
-        alert.alertStyle = .informational
-        alert.messageText = "Add Bookmark"
-        alert.informativeText = targetURL.path
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Cancel")
-
-        let groupNames = bookmarksConfig.groups.map(\.name)
-        let accessoryContainer = NSView(frame: NSRect(x: 0, y: 0, width: 340, height: 108))
-
-        let groupPopup = NSPopUpButton(frame: NSRect(x: 0, y: 82, width: 340, height: 26), pullsDown: false)
-        groupPopup.addItems(withTitles: groupNames)
-        groupPopup.addItem(withTitle: "New…")
-        let lastIndex = Self.lastSelectedBookmarkGroupIndex
-        if lastIndex >= 0, lastIndex < groupPopup.numberOfItems {
-            groupPopup.selectItem(at: lastIndex)
-        }
-
-        let displayNameField = NSTextField(frame: NSRect(x: 0, y: 52, width: 340, height: 24))
-        displayNameField.stringValue = defaultDisplayName
-
-        let shortcutLabel = NSTextField(labelWithString: "Shortcut sequence (optional):")
-        shortcutLabel.frame = NSRect(x: 0, y: 26, width: 260, height: 20)
-        shortcutLabel.font = .systemFont(ofSize: 11)
-        shortcutLabel.textColor = .secondaryLabelColor
-
-        let shortcutField = NSTextField(frame: NSRect(x: 0, y: 0, width: 180, height: 24))
-        shortcutField.placeholderString = "e.g. d or d u"
-
-        accessoryContainer.addSubview(groupPopup)
-        accessoryContainer.addSubview(displayNameField)
-        accessoryContainer.addSubview(shortcutLabel)
-        accessoryContainer.addSubview(shortcutField)
-        alert.accessoryView = accessoryContainer
-
-        alert.window.initialFirstResponder = shortcutField
-
-        guard alert.runModal() == .alertFirstButtonReturn else {
-            return
-        }
-
-        let selectedGroupIndex = groupPopup.indexOfSelectedItem
-        Self.lastSelectedBookmarkGroupIndex = selectedGroupIndex
-
-        let selectedGroupName: String
-        var groupShortcutKey: String?
-        if selectedGroupIndex >= 0, selectedGroupIndex < groupNames.count {
-            selectedGroupName = groupNames[selectedGroupIndex]
-        } else {
-            guard let newGroup = presentNewBookmarkGroupAlert() else {
-                return
-            }
-            selectedGroupName = newGroup.name
-            groupShortcutKey = newGroup.shortcutKey
-        }
-
-        guard !selectedGroupName.isEmpty else {
-            return
-        }
-
-        let displayName = displayNameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        let resolvedDisplayName = displayName.isEmpty ? defaultDisplayName : displayName
-
-        let entryShortcutKey = BookmarkShortcut.canonical(from: shortcutField.stringValue)
-
-        saveBookmark(
-            entry: BookmarkEntry(
-                displayName: resolvedDisplayName,
-                path: targetURL.path,
-                shortcutKey: entryShortcutKey
-            ),
-            groupName: selectedGroupName,
-            groupShortcutKey: groupShortcutKey
-        )
-    }
-
-    private func presentNewBookmarkGroupAlert() -> (name: String, shortcutKey: String?)? {
-        let alert = NSAlert()
-        alert.alertStyle = .informational
-        alert.messageText = "Create New Bookmark Group"
-        alert.addButton(withTitle: "Create")
-        alert.addButton(withTitle: "Cancel")
-
-        let container = NSView(frame: NSRect(x: 0, y: 0, width: 340, height: 50))
-
-        let groupNameField = NSTextField(frame: NSRect(x: 0, y: 26, width: 210, height: 24))
-        groupNameField.placeholderString = "Group name"
-
-        let groupShortcutField = NSTextField(frame: NSRect(x: 220, y: 26, width: 120, height: 24))
-        groupShortcutField.placeholderString = "Group key"
-
-        let shortcutHintLabel = NSTextField(labelWithString: "Shortcut sequence (optional)")
-        shortcutHintLabel.frame = NSRect(x: 0, y: 2, width: 250, height: 20)
-        shortcutHintLabel.font = .systemFont(ofSize: 11)
-        shortcutHintLabel.textColor = .secondaryLabelColor
-
-        container.addSubview(groupNameField)
-        container.addSubview(groupShortcutField)
-        container.addSubview(shortcutHintLabel)
-        alert.accessoryView = container
-        alert.window.initialFirstResponder = groupNameField
-
-        guard alert.runModal() == .alertFirstButtonReturn else {
-            return nil
-        }
-
-        let groupName = groupNameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !groupName.isEmpty else {
-            presentErrorAlert(
-                title: "Missing Group Name",
-                informativeText: "Group name is required when creating a new group."
-            )
-            return nil
-        }
-
-        return (
-            name: groupName,
-            shortcutKey: BookmarkShortcut.canonical(from: groupShortcutField.stringValue)
-        )
-    }
-
-    private func saveBookmark(entry: BookmarkEntry, groupName: String, groupShortcutKey: String? = nil) {
-        var latestConfig = configManager.loadBookmarksConfig()
-        var groups = latestConfig.groups
-        let normalizedEntry = normalizeBookmarkEntry(entry)
-
-        if let groupIndex = groups.firstIndex(where: { $0.name == groupName }) {
-            if let entryIndex = groups[groupIndex].entries.firstIndex(where: {
-                isSameBookmarkPath($0.path, normalizedEntry.path)
-            }) {
-                groups[groupIndex].entries[entryIndex] = normalizedEntry
-            } else {
-                groups[groupIndex].entries.append(normalizedEntry)
-            }
-        } else {
-            groups.append(BookmarkGroup(
-                name: groupName,
-                entries: [normalizedEntry],
-                shortcutKey: groupShortcutKey
-            ))
-        }
-
-        latestConfig.groups = groups
-
-        do {
-            try configManager.saveBookmarksConfig(latestConfig)
-            bookmarksConfig = latestConfig
-            persistSecurityScopedBookmark(for: normalizedEntry.path)
-            sidebarViewModel.reloadSections()
-            propagateBookmarksConfig()
-            showActionToast("Saved bookmark \"\(normalizedEntry.displayName)\"")
-        } catch {
-            let alert = NSAlert()
-            alert.alertStyle = .critical
-            alert.messageText = "Failed to save bookmark"
-            alert.informativeText = error.localizedDescription
-            alert.addButton(withTitle: "OK")
-            alert.runModal()
-        }
-    }
-
-    private func persistSecurityScopedBookmark(for path: String) {
-        let resolvedPath = UserPaths.resolveBookmarkPath(path)
-        let bookmarkURL = URL(fileURLWithPath: resolvedPath, isDirectory: true).standardizedFileURL
-        Task { [weak self] in
-            guard let self else {
-                return
-            }
-            do {
-                try await self.viewModel.securityScopedBookmarkService.saveBookmark(for: bookmarkURL)
-            } catch {
-                await MainActor.run {
-                    self.presentBookmarkPermissionSaveError(for: bookmarkURL, error: error)
-                }
-            }
-        }
-    }
-
-    private func normalizeBookmarkEntry(_ entry: BookmarkEntry) -> BookmarkEntry {
-        BookmarkEntry(
-            displayName: entry.displayName,
-            path: normalizedBookmarkPath(entry.path),
-            shortcutKey: entry.shortcutKey
-        )
-    }
-
-    private func normalizedBookmarkPath(_ rawPath: String) -> String {
-        UserPaths.portableBookmarkPath(rawPath)
-    }
-
-    private func isSameBookmarkPath(_ lhs: String, _ rhs: String) -> Bool {
-        normalizedBookmarkPath(lhs) == normalizedBookmarkPath(rhs)
-    }
-
-    private func presentSidebarBookmarkEditor(
-        for entry: SidebarViewModel.SidebarEntry,
-        sectionKind: SidebarViewModel.SectionKind
-    ) {
-        let latestConfig = configManager.loadBookmarksConfig()
-        guard let originalGroupName = resolvedBookmarkGroupName(for: sectionKind, in: latestConfig) else {
-            NSSound.beep()
-            return
-        }
-
-        guard let result = presentSidebarBookmarkEditAlert(
-            initialEntry: entry,
-            initialGroupName: originalGroupName,
-            groups: latestConfig.groups
-        ) else {
-            return
-        }
-
-        applySidebarBookmarkEdit(originalEntry: entry, originalGroupName: originalGroupName, result: result)
-    }
-
-    private func deleteSidebarBookmark(
-        _ entry: SidebarViewModel.SidebarEntry,
-        sectionKind: SidebarViewModel.SectionKind
-    ) {
-        var latestConfig = configManager.loadBookmarksConfig()
-        guard let groupName = resolvedBookmarkGroupName(for: sectionKind, in: latestConfig),
-              let groupIndex = latestConfig.groups.firstIndex(where: { $0.name == groupName }) else {
-            NSSound.beep()
-            return
-        }
-
-        let alert = NSAlert()
-        alert.alertStyle = .warning
-        alert.messageText = "Delete Bookmark"
-        alert.informativeText = "Delete \"\(entry.displayName)\"?"
-        alert.addButton(withTitle: "Delete")
-        alert.addButton(withTitle: "Cancel")
-        guard alert.runModal() == .alertFirstButtonReturn else {
-            return
-        }
-
-        let previousCount = latestConfig.groups[groupIndex].entries.count
-        latestConfig.groups[groupIndex].entries.removeAll {
-            isSameBookmarkPath($0.path, entry.path)
-        }
-        guard latestConfig.groups[groupIndex].entries.count != previousCount else {
-            NSSound.beep()
-            return
-        }
-
-        persistBookmarkConfigAfterSidebarAction(
-            latestConfig,
-            toastMessage: "Deleted bookmark \"\(entry.displayName)\""
-        )
-    }
-
-    private func resolvedBookmarkGroupName(
-        for sectionKind: SidebarViewModel.SectionKind,
-        in config: BookmarksConfig
-    ) -> String? {
-        switch sectionKind {
-        case .bookmarkGroup(let groupName):
-            return groupName
-        case .favorites:
-            return config.groups.first(where: { $0.isDefault })?.name
-        case .pinned, .recent:
-            return nil
-        }
-    }
-
-    private func presentSidebarBookmarkEditAlert(
-        initialEntry: SidebarViewModel.SidebarEntry,
-        initialGroupName: String,
-        groups: [BookmarkGroup]
-    ) -> SidebarBookmarkEditResult? {
-        guard !groups.isEmpty else {
-            return nil
-        }
-
-        let groupNames = groups.map(\.name)
-        let initialShortcut = groups
-            .first(where: { $0.name == initialGroupName })?
-            .entries
-            .first(where: { isSameBookmarkPath($0.path, initialEntry.path) })?
-            .shortcutKey
-
-        let alert = NSAlert()
-        alert.alertStyle = .informational
-        alert.messageText = "Edit Bookmark"
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Cancel")
-
-        let container = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 186))
-
-        let groupLabel = NSTextField(labelWithString: "Group")
-        groupLabel.frame = NSRect(x: 0, y: 160, width: 220, height: 20)
-        groupLabel.font = .systemFont(ofSize: 11)
-        groupLabel.textColor = .secondaryLabelColor
-
-        let groupPopup = NSPopUpButton(frame: NSRect(x: 0, y: 136, width: 260, height: 24), pullsDown: false)
-        groupPopup.addItems(withTitles: groupNames)
-
-        let displayNameLabel = NSTextField(labelWithString: "Display Name")
-        displayNameLabel.frame = NSRect(x: 0, y: 108, width: 200, height: 20)
-        displayNameLabel.font = .systemFont(ofSize: 11)
-        displayNameLabel.textColor = .secondaryLabelColor
-
-        let displayNameField = NSTextField(frame: NSRect(x: 0, y: 84, width: 210, height: 24))
-        displayNameField.stringValue = initialEntry.displayName
-
-        let shortcutLabel = NSTextField(labelWithString: "Shortcut sequence (optional)")
-        shortcutLabel.frame = NSRect(x: 220, y: 108, width: 240, height: 20)
-        shortcutLabel.font = .systemFont(ofSize: 11)
-        shortcutLabel.textColor = .secondaryLabelColor
-
-        let shortcutField = NSTextField(frame: NSRect(x: 220, y: 84, width: 170, height: 24))
-        shortcutField.placeholderString = "e.g. d or d u"
-        shortcutField.stringValue = initialShortcut ?? ""
-
-        let pathLabel = NSTextField(labelWithString: "Path")
-        pathLabel.frame = NSRect(x: 0, y: 56, width: 210, height: 20)
-        pathLabel.font = .systemFont(ofSize: 11)
-        pathLabel.textColor = .secondaryLabelColor
-
-        let pathField = NSTextField(frame: NSRect(x: 0, y: 32, width: 460, height: 24))
-        pathField.stringValue = initialEntry.path
-
-        container.addSubview(groupLabel)
-        container.addSubview(groupPopup)
-        container.addSubview(displayNameLabel)
-        container.addSubview(displayNameField)
-        container.addSubview(shortcutLabel)
-        container.addSubview(shortcutField)
-        container.addSubview(pathLabel)
-        container.addSubview(pathField)
-        alert.accessoryView = container
-
-        if let initialIndex = groupNames.firstIndex(of: initialGroupName) {
-            groupPopup.selectItem(at: initialIndex)
-        } else {
-            groupPopup.selectItem(at: 0)
-        }
-
-        guard alert.runModal() == .alertFirstButtonReturn else {
-            return nil
-        }
-
-        let selectedGroupIndex = groupPopup.indexOfSelectedItem
-        guard selectedGroupIndex >= 0, groupNames.indices.contains(selectedGroupIndex) else {
-            return nil
-        }
-
-        let selectedGroupName = groupNames[selectedGroupIndex].trimmingCharacters(in: .whitespacesAndNewlines)
-        let displayName = displayNameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        let path = pathField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !selectedGroupName.isEmpty, !displayName.isEmpty, !path.isEmpty else {
-            presentErrorAlert(
-                title: "Missing Required Fields",
-                informativeText: "Group, display name, and path are required."
-            )
-            return nil
-        }
-
-        return SidebarBookmarkEditResult(
-            groupName: selectedGroupName,
-            displayName: displayName,
-            path: path,
-            shortcutKey: BookmarkShortcut.canonical(from: shortcutField.stringValue)
-        )
-    }
-
-    private func applySidebarBookmarkEdit(
-        originalEntry: SidebarViewModel.SidebarEntry,
-        originalGroupName: String,
-        result: SidebarBookmarkEditResult
-    ) {
-        var latestConfig = configManager.loadBookmarksConfig()
-        guard let originalGroupIndex = latestConfig.groups.firstIndex(where: { $0.name == originalGroupName }),
-              let targetGroupIndex = latestConfig.groups.firstIndex(where: { $0.name == result.groupName }) else {
-            NSSound.beep()
-            return
-        }
-
-        latestConfig.groups[originalGroupIndex].entries.removeAll {
-            isSameBookmarkPath($0.path, originalEntry.path)
-        }
-        let updatedEntry = BookmarkEntry(
-            displayName: result.displayName,
-            path: normalizedBookmarkPath(result.path),
-            shortcutKey: result.shortcutKey
-        )
-
-        if let existingIndex = latestConfig.groups[targetGroupIndex].entries.firstIndex(where: {
-            isSameBookmarkPath($0.path, updatedEntry.path)
-        }) {
-            latestConfig.groups[targetGroupIndex].entries[existingIndex] = updatedEntry
-        } else {
-            latestConfig.groups[targetGroupIndex].entries.append(updatedEntry)
-        }
-
-        persistBookmarkConfigAfterSidebarAction(
-            latestConfig,
-            toastMessage: "Updated bookmark \"\(updatedEntry.displayName)\""
-        )
-        persistSecurityScopedBookmark(for: updatedEntry.path)
-    }
-
-    private func persistBookmarkConfigAfterSidebarAction(
-        _ config: BookmarksConfig,
-        toastMessage: String
-    ) {
-        do {
-            try configManager.saveBookmarksConfig(config)
-            bookmarksConfig = config
-            propagateBookmarksConfig()
-            sidebarViewModel.reloadSections()
-            showActionToast(toastMessage)
-        } catch {
-            presentErrorAlert(
-                title: "Failed to save bookmark",
-                informativeText: error.localizedDescription
-            )
-        }
-    }
-
-    // MARK: - Batch Rename
-
-    func presentBatchRenameWindow() {
-        let urls = viewModel.activePane.markedOrSelectedURLs()
-        guard !urls.isEmpty else { return }
-
-        let urlSet = Set(urls)
-        let items = viewModel.activePane.directoryContents.displayedItems
-            .filter { urlSet.contains($0.url) }
-        guard !items.isEmpty else { return }
-
-        let allItems = viewModel.activePane.directoryContents.displayedItems
-
-        let batchVM = BatchRenameViewModel(
-            sourceFiles: items,
-            allDirectoryFiles: allItems,
-            configManager: configManager
-        )
-
-        batchVM.onApplyRequested = { [weak self] changes in
-            self?.viewModel.executeBatchRename(renames: changes)
-            self?.batchRenameWindowController?.close()
-            self?.batchRenameWindowController = nil
-        }
-
-        batchVM.onDismissRequested = { [weak self] in
-            self?.batchRenameWindowController?.close()
-            self?.batchRenameWindowController = nil
-        }
-
-        let vc = BatchRenameViewController(viewModel: batchVM)
-        let window = NSWindow(contentViewController: vc)
-        window.title = "Batch Rename (\(items.count) files)"
-        window.setContentSize(NSSize(width: 720, height: 600))
-        window.styleMask = [.titled, .closable, .resizable]
-        window.minSize = NSSize(width: 600, height: 400)
-        window.center()
-
-        let wc = NSWindowController(window: window)
-        wc.showWindow(nil)
-        batchRenameWindowController = wc
-    }
-
-    // MARK: - Markdown Preview
-
-    private func presentMarkdownPreviews(for fileURLs: [URL]) {
-        guard let window = view.window else {
-            return
-        }
-
-        let palette = currentFilerTheme.palette
-        let normalizedURLs = Array(Set(fileURLs.map(\.standardizedFileURL)))
-        for fileURL in normalizedURLs {
-            if let panel = markdownPreviewPanelControllers[fileURL] {
-                panel.focus()
-                continue
-            }
-
-            let panel = MarkdownPreviewPanelController()
-            panel.onDismiss = { [weak self] in
-                self?.markdownPreviewPanelControllers.removeValue(forKey: fileURL)
-                self?.focusActivePane()
-            }
-
-            panel.showRelativeTo(window: window, fileURL: fileURL, palette: palette)
-            markdownPreviewPanelControllers[fileURL] = panel
-        }
-    }
 }

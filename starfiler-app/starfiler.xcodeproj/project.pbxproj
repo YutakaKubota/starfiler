@@ -36,6 +36,9 @@
 		CC00000000000000000000A1 /* AppDelegate+MainMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000A1 /* AppDelegate+MainMenu.swift */; };
 		CC00000000000000000000A2 /* AppDelegate+SettingsWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000A2 /* AppDelegate+SettingsWindow.swift */; };
 		CC0000000000000000000002 /* MainWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000002 /* MainWindowController.swift */; };
+		CC0000000000000000000087 /* MainWindowController+ConfigMonitoring.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000087 /* MainWindowController+ConfigMonitoring.swift */; };
+		CC0000000000000000000088 /* MainWindowController+TerminalSessions.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000088 /* MainWindowController+TerminalSessions.swift */; };
+		CC0000000000000000000089 /* MainWindowController+WindowConstraints.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000089 /* MainWindowController+WindowConstraints.swift */; };
 		CC0000000000000000000003 /* FilePaneViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000003 /* FilePaneViewController.swift */; };
 		CC0000000000000000000080 /* FilePaneViewController+Animations.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000080 /* FilePaneViewController+Animations.swift */; };
 		CC0000000000000000000081 /* FilePaneViewController+ContextMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000081 /* FilePaneViewController+ContextMenu.swift */; };
@@ -56,6 +59,11 @@
 		CC000000000000000000000D /* SecurityScopedBookmarkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000010 /* SecurityScopedBookmarkService.swift */; };
 		CC000000000000000000000E /* MainViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000011 /* MainViewModel.swift */; };
 		CC000000000000000000000F /* MainSplitViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000012 /* MainSplitViewController.swift */; };
+		CC00000000000000000000B0 /* MainSplitViewController+Bookmarks.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000B0 /* MainSplitViewController+Bookmarks.swift */; };
+		CC00000000000000000000B1 /* MainSplitViewController+Navigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000B1 /* MainSplitViewController+Navigation.swift */; };
+		CC00000000000000000000B2 /* MainSplitViewController+PaneLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000B2 /* MainSplitViewController+PaneLayout.swift */; };
+		CC00000000000000000000B3 /* MainSplitViewController+GoToPath.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000B3 /* MainSplitViewController+GoToPath.swift */; };
+		CC00000000000000000000B4 /* MainSplitViewController+BatchRename.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000B4 /* MainSplitViewController+BatchRename.swift */; };
 		CC0000000000000000000010 /* KeyEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000013 /* KeyEvent.swift */; };
 		CC0000000000000000000011 /* KeyAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000014 /* KeyAction.swift */; };
 		CC0000000000000000000012 /* KeyInterpreter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000015 /* KeyInterpreter.swift */; };
@@ -229,6 +237,9 @@
 		BB00000000000000000000A1 /* AppDelegate+MainMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+MainMenu.swift"; sourceTree = "<group>"; };
 		BB00000000000000000000A2 /* AppDelegate+SettingsWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+SettingsWindow.swift"; sourceTree = "<group>"; };
 		BB0000000000000000000002 /* MainWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowController.swift; sourceTree = "<group>"; };
+		BB0000000000000000000087 /* MainWindowController+ConfigMonitoring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MainWindowController+ConfigMonitoring.swift"; sourceTree = "<group>"; };
+		BB0000000000000000000088 /* MainWindowController+TerminalSessions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MainWindowController+TerminalSessions.swift"; sourceTree = "<group>"; };
+		BB0000000000000000000089 /* MainWindowController+WindowConstraints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MainWindowController+WindowConstraints.swift"; sourceTree = "<group>"; };
 		BB0000000000000000000003 /* FilePaneViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePaneViewController.swift; sourceTree = "<group>"; };
 		BB0000000000000000000080 /* FilePaneViewController+Animations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FilePaneViewController+Animations.swift"; sourceTree = "<group>"; };
 		BB0000000000000000000081 /* FilePaneViewController+ContextMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FilePaneViewController+ContextMenu.swift"; sourceTree = "<group>"; };
@@ -252,6 +263,11 @@
 		BB0000000000000000000010 /* SecurityScopedBookmarkService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityScopedBookmarkService.swift; sourceTree = "<group>"; };
 		BB0000000000000000000011 /* MainViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewModel.swift; sourceTree = "<group>"; };
 		BB0000000000000000000012 /* MainSplitViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainSplitViewController.swift; sourceTree = "<group>"; };
+		BB00000000000000000000B0 /* MainSplitViewController+Bookmarks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MainSplitViewController+Bookmarks.swift"; sourceTree = "<group>"; };
+		BB00000000000000000000B1 /* MainSplitViewController+Navigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MainSplitViewController+Navigation.swift"; sourceTree = "<group>"; };
+		BB00000000000000000000B2 /* MainSplitViewController+PaneLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MainSplitViewController+PaneLayout.swift"; sourceTree = "<group>"; };
+		BB00000000000000000000B3 /* MainSplitViewController+GoToPath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MainSplitViewController+GoToPath.swift"; sourceTree = "<group>"; };
+		BB00000000000000000000B4 /* MainSplitViewController+BatchRename.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MainSplitViewController+BatchRename.swift"; sourceTree = "<group>"; };
 		BB0000000000000000000013 /* KeyEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyEvent.swift; sourceTree = "<group>"; };
 		BB0000000000000000000014 /* KeyAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyAction.swift; sourceTree = "<group>"; };
 		BB0000000000000000000015 /* KeyInterpreter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyInterpreter.swift; sourceTree = "<group>"; };
@@ -517,6 +533,9 @@
 			isa = PBXGroup;
 			children = (
 				BB0000000000000000000002 /* MainWindowController.swift */,
+				BB0000000000000000000087 /* MainWindowController+ConfigMonitoring.swift */,
+				BB0000000000000000000088 /* MainWindowController+TerminalSessions.swift */,
+				BB0000000000000000000089 /* MainWindowController+WindowConstraints.swift */,
 				BB0000000000000000000056 /* TerminalSessionWindowController.swift */,
 				BB0000000000000000000079 /* TerminalSessionManagerWindowController.swift */,
 			);
@@ -651,6 +670,11 @@
 			isa = PBXGroup;
 			children = (
 				BB0000000000000000000012 /* MainSplitViewController.swift */,
+				BB00000000000000000000B4 /* MainSplitViewController+BatchRename.swift */,
+				BB00000000000000000000B0 /* MainSplitViewController+Bookmarks.swift */,
+				BB00000000000000000000B3 /* MainSplitViewController+GoToPath.swift */,
+				BB00000000000000000000B1 /* MainSplitViewController+Navigation.swift */,
+				BB00000000000000000000B2 /* MainSplitViewController+PaneLayout.swift */,
 				BB0000000000000000000055 /* MainContainerViewController.swift */,
 				BB000000000000000000005D /* ActionToastPresenter.swift */,
 				BB000000000000000000005E /* BorderlessSplitView.swift */,
@@ -1082,6 +1106,9 @@
 				CC00000000000000000000A1 /* AppDelegate+MainMenu.swift in Sources */,
 				CC00000000000000000000A2 /* AppDelegate+SettingsWindow.swift in Sources */,
 				CC0000000000000000000002 /* MainWindowController.swift in Sources */,
+				CC0000000000000000000087 /* MainWindowController+ConfigMonitoring.swift in Sources */,
+				CC0000000000000000000088 /* MainWindowController+TerminalSessions.swift in Sources */,
+				CC0000000000000000000089 /* MainWindowController+WindowConstraints.swift in Sources */,
 				CC0000000000000000000003 /* FilePaneViewController.swift in Sources */,
 				CC0000000000000000000080 /* FilePaneViewController+Animations.swift in Sources */,
 				CC0000000000000000000084 /* FilePaneViewController+CollectionView.swift in Sources */,
@@ -1102,6 +1129,11 @@
 				CC000000000000000000000D /* SecurityScopedBookmarkService.swift in Sources */,
 				CC000000000000000000000E /* MainViewModel.swift in Sources */,
 				CC000000000000000000000F /* MainSplitViewController.swift in Sources */,
+				CC00000000000000000000B4 /* MainSplitViewController+BatchRename.swift in Sources */,
+				CC00000000000000000000B0 /* MainSplitViewController+Bookmarks.swift in Sources */,
+				CC00000000000000000000B3 /* MainSplitViewController+GoToPath.swift in Sources */,
+				CC00000000000000000000B1 /* MainSplitViewController+Navigation.swift in Sources */,
+				CC00000000000000000000B2 /* MainSplitViewController+PaneLayout.swift in Sources */,
 				CC0000000000000000000010 /* KeyEvent.swift in Sources */,
 				CC0000000000000000000011 /* KeyAction.swift in Sources */,
 				CC0000000000000000000012 /* KeyInterpreter.swift in Sources */,
