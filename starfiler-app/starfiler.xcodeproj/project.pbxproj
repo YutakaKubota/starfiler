@@ -528,6 +528,7 @@
 				BB0000000000000000000001 /* AppDelegate.swift */,
 				BB00000000000000000000A1 /* AppDelegate+MainMenu.swift */,
 				BB00000000000000000000A2 /* AppDelegate+SettingsWindow.swift */,
+				BB00000000000000000000A3 /* MainMenuBuilder.swift */,
 				BB000000000000000000000D /* Info.plist */,
 			);
 			path = App;
@@ -1110,6 +1111,7 @@
 				CC0000000000000000000001 /* AppDelegate.swift in Sources */,
 				CC00000000000000000000A1 /* AppDelegate+MainMenu.swift in Sources */,
 				CC00000000000000000000A2 /* AppDelegate+SettingsWindow.swift in Sources */,
+				CC00000000000000000000A3 /* MainMenuBuilder.swift in Sources */,
 				CC0000000000000000000002 /* MainWindowController.swift in Sources */,
 				CC0000000000000000000087 /* MainWindowController+ConfigMonitoring.swift in Sources */,
 				CC0000000000000000000088 /* MainWindowController+TerminalSessions.swift in Sources */,
