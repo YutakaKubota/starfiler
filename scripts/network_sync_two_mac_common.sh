@@ -371,12 +371,33 @@ ns2m_launch_role() {
   local config_root="$2"
   local sync_root="$3"
   local log_file="$4"
+  : > "$log_file"
 
-  "$NS2M_APP_BIN" \
+  open -n -a "/Applications/Starfiler.app" --args \
     --uitest \
     --disable-animations \
     --config-root "$config_root" \
-    --sandbox-root "$sync_root" \
-    > "$log_file" 2>&1 &
-  print -r -- "$!"
+    --sandbox-root "$sync_root"
+
+  local pid=""
+  local attempt=0
+  while (( attempt < 20 )); do
+    pid="$(
+      ps -axo pid=,command= \
+        | grep -F "/Applications/Starfiler.app/Contents/MacOS/Starfiler" \
+        | grep -F -- "--config-root $config_root" \
+        | grep -F -- "--sandbox-root $sync_root" \
+        | tail -n 1 \
+        | awk '{print $1}'
+    )"
+    if [[ -n "$pid" ]]; then
+      print -r -- "$pid"
+      return 0
+    fi
+    sleep 0.5
+    (( attempt += 1 ))
+  done
+
+  echo "Failed to find launched $role process for config root $config_root" >&2
+  return 1
 }
