@@ -95,6 +95,20 @@ if [[ "$LOCAL" = "$MERGE_BASE" ]]; then
         MSG=$(git log --oneline -1)
         log "SUCCESS: $MSG"
         notify "Git AutoSync [$PROJECT_SLUG]" "同期完了: $MSG"
+
+        # pull成功後にビルド＆インストール
+        BUILD_SCRIPT="$REPO_DIR/scripts/build_and_install.sh"
+        if [[ -x "$BUILD_SCRIPT" ]]; then
+            log "BUILD: build_and_install.sh を実行..."
+            notify "Git AutoSync [$PROJECT_SLUG]" "ビルド開始..."
+            if bash "$BUILD_SCRIPT" --launch 2>> "$LOG_FILE"; then
+                log "BUILD: 成功"
+                notify "Git AutoSync [$PROJECT_SLUG]" "ビルド＆インストール完了"
+            else
+                log "BUILD: 失敗"
+                notify "Git AutoSync [$PROJECT_SLUG]" "ビルド失敗 - ログを確認してください"
+            fi
+        fi
     else
         # コンフリクト発生 -> Claude Codeに解決させる
         CONFLICTED=$(git diff --name-only --diff-filter=U 2>/dev/null | tr '\n' ' ')
@@ -111,6 +125,19 @@ if [[ "$LOCAL" = "$MERGE_BASE" ]]; then
         if [[ $CLAUDE_EXIT -eq 0 ]] && git diff --quiet && git diff --cached --quiet; then
             log "SUCCESS: Claude Code がコンフリクトを解決"
             notify "Git AutoSync [$PROJECT_SLUG]" "Claude Code がコンフリクトを解決しました"
+
+            # コンフリクト解決後にビルド＆インストール
+            BUILD_SCRIPT="$REPO_DIR/scripts/build_and_install.sh"
+            if [[ -x "$BUILD_SCRIPT" ]]; then
+                log "BUILD: build_and_install.sh を実行..."
+                if bash "$BUILD_SCRIPT" --launch 2>> "$LOG_FILE"; then
+                    log "BUILD: 成功"
+                    notify "Git AutoSync [$PROJECT_SLUG]" "ビルド＆インストール完了"
+                else
+                    log "BUILD: 失敗"
+                    notify "Git AutoSync [$PROJECT_SLUG]" "ビルド失敗 - ログを確認してください"
+                fi
+            fi
         else
             log "ERROR: コンフリクト解決失敗 (claude exit: $CLAUDE_EXIT)、rebase を中断"
             notify "Git AutoSync [$PROJECT_SLUG]" "コンフリクト解決失敗 - 手動対応が必要です"
@@ -139,6 +166,19 @@ else
     if [[ $CLAUDE_EXIT -eq 0 ]] && git diff --quiet && git diff --cached --quiet; then
         log "SUCCESS: Claude Code が diverge を解決"
         notify "Git AutoSync [$PROJECT_SLUG]" "Claude Code が diverge を解決しました"
+
+        # diverge解決後にビルド＆インストール
+        BUILD_SCRIPT="$REPO_DIR/scripts/build_and_install.sh"
+        if [[ -x "$BUILD_SCRIPT" ]]; then
+            log "BUILD: build_and_install.sh を実行..."
+            if bash "$BUILD_SCRIPT" --launch 2>> "$LOG_FILE"; then
+                log "BUILD: 成功"
+                notify "Git AutoSync [$PROJECT_SLUG]" "ビルド＆インストール完了"
+            else
+                log "BUILD: 失敗"
+                notify "Git AutoSync [$PROJECT_SLUG]" "ビルド失敗 - ログを確認してください"
+            fi
+        fi
     else
         log "ERROR: diverge 解決失敗 (claude exit: $CLAUDE_EXIT)"
         notify "Git AutoSync [$PROJECT_SLUG]" "diverge 解決失敗 - 手動対応が必要です"
